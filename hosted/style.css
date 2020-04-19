@@ -1,0 +1,44 @@
+#error {
+	display:none;
+    top: 250px;
+    width: 250px;
+    height: 150px;
+    position: absolute;
+    z-index: 999;
+    right: 0px;
+	border: 2px solid red;
+}
+
+#errorMessage {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: red;
+    font-style: italic;
+}
+
+#error h3 {
+    width: 200px;
+    position: absolute;
+    top: 0px;
+    left: 20px;
+}
+
+#question {
+	margin-bottom: 20px;
+}
+
+#question, #answers {
+	border: 2px solid black;
+	padding: 20px;
+}
+
+#answers div {
+	border: 1px solid black;
+	padding: 10px;
+	margin: 10px;
+}
+
+#answers div:hover {
+	background-color: black;
+	color: white;
+}
