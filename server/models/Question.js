@@ -11,37 +11,31 @@ const QuestionSchema = new mongoose.Schema({
     required: true,
     trim: true,
     unique: true,
-    match: /^[A-Za-z0-9_\-.]{1,16}$/,
   },
   answer1: {
     type: String,
     required: true,
     trim: true,
-    match: /^[A-Za-z0-9_\-.]{1,16}$/,
   },
   answer2: {
     type: String,
     required: true,
     trim: true,
-    match: /^[A-Za-z0-9_\-.]{1,16}$/,
   },
   answer3: {
     type: String,
     required: true,
     trim: true,
-    match: /^[A-Za-z0-9_\-.]{1,16}$/,
   },
   answer4: {
     type: String,
     required: true,
     trim: true,
-    match: /^[A-Za-z0-9_\-.]{1,16}$/,
   },
   correctAnswer: {
     type: String,
     required: true,
     trim: true,
-    match: /^[A-Za-z0-9_\-.]{1,16}$/,
   },
   createdDate: {
     type: Date,

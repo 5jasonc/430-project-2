@@ -1,3 +1,14 @@
+#chat {
+    width: 250px;
+    height: 150px;
+    position: absolute;
+    z-index: 999;
+    bottom: 15px;
+	right: 15px;
+	border: 2px solid green;
+	overflow: scroll;
+}
+
 #error {
 	display:none;
     top: 250px;
@@ -16,7 +27,7 @@
     font-style: italic;
 }
 
-#error h3 {
+#chat h3 {
     width: 200px;
     position: absolute;
     top: 0px;
@@ -25,20 +36,34 @@
 
 #question {
 	margin-bottom: 20px;
+	padding: 20px;
 }
 
 #question, #answers {
 	border: 2px solid black;
-	padding: 20px;
 }
 
-#answers div {
+#answers {
+	display: flex;
+	flex-direction: column;
+	padding: 10px;
+}
+
+#bottomAnswers, #topAnswers {
+	display: flex;
+	justify-content: space-between;
+}
+
+#answers div div {
+	display: flex;
+	justify-content: center;
 	border: 1px solid black;
 	padding: 10px;
 	margin: 10px;
+	width: 100%;
 }
 
-#answers div:hover {
+#answers div div:hover {
 	background-color: black;
 	color: white;
 }

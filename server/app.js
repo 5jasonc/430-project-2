@@ -1,7 +1,7 @@
 // IMPORT LIBRARIES
 const path = require('path');
 const express = require('express');
-// const socketIO = require('socket.io');
+const socketIO = require('socket.io');
 const compression = require('compression');
 const favicon = require('serve-favicon');
 const cookieParser = require('cookie-parser');
@@ -95,4 +95,84 @@ const server = app.listen(port, (err) => {
   console.log(`Listening on port ${port}`);
 });
 
-module.exports.server = server;
+// CONFIGURE SOCKET IO AND GAME SETTINGS
+const io = socketIO(server);
+
+const game = require('./controllers/App.js');
+
+let numConnections = 0;
+let numUsersAnswered = 0;
+
+// On socket connect
+const onConnection = (socket) => {
+  numConnections++;
+
+  const message = `Guest${numConnections} has connected.`;
+
+  io.sockets.emit('playerConnected', {
+    msg: message,
+    numConnections,
+  });
+
+  // On socket disconnect
+  socket.on('disconnect', () => {
+    console.log(`Guest${numConnections} has disconnected.`);
+
+    io.sockets.emit('socket disconnect', {
+      msg: `Guest${numConnections} has disconnected.`,
+    });
+
+    numConnections--;
+  });
+
+  // On submitted answer
+  socket.on('questionAnswered', (object) => {
+    numUsersAnswered++;
+    if (numUsersAnswered >= numConnections) numUsersAnswered = 0;
+
+    game.getResult(object.question, object.playerAnswer, (result) => {
+      if (result) {
+        socket.emit('answer processed', {
+          msg: `The answer ${object.playerAnswer} was correct!`,
+        });
+      } else {
+        socket.emit('answer processed', {
+          msg: `The answer ${object.playerAnswer} was incorrect!`,
+        });
+      }
+    });
+  });
+
+  console.log(message);
+};
+
+// LISTEN FOR CONNECTIONS AND MESSAGES
+io.sockets.on('connection', onConnection);
+
+/*   socket.on('answer submitted', (answer) => {
+      console.log(`User submitted the answer: ${answer}`);
+
+      // If answer correct
+      if (answer === questionData[questionKey].correctAnswer) {
+        const account = Account.AccountModel.findByUsername(req.session.account.username, () => {
+          account.score += 10;
+
+          const savePromise = account.save();
+
+          savePromise.then(() => {
+            socket.emit('correctAnswer', 'Correct!');
+          });
+
+          savePromise.catch((err) => {
+            console.log(err);
+
+            return res.status(400).json({ error: 'Error submitting answer' });
+          });
+        });
+      } else {
+        console.log(questionData[questionKey].correctAnswer);
+
+        socket.emit('wrongAnswer', 'Wrong Answer!');
+      }
+    });
+  }); */

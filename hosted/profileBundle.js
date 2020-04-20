@@ -48,7 +48,11 @@ $(document).ready(function () {
 "use strict";
 
 var handleError = function handleError(message) {
+  console.log(message);
   $("#errorMessage").text(message);
+  $("#error").animate({
+    width: 'hide'
+  }, 350);
   $("#error").animate({
     width: 'toggle'
   }, 350);
