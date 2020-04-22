@@ -7,7 +7,7 @@ const gamePage = (req, res) => {
   res.render('app', { csrfToken: req.csrfToken() });
 };
 
-// Returns is player answer matches correct answer for question
+// Returns if player answer matches correct answer for question
 // Returns true or false
 const getResult = (question, playerAnswer, callback) => {
   Question.QuestionModel.findByQuestion(question, (err, doc) => {
@@ -18,5 +18,16 @@ const getResult = (question, playerAnswer, callback) => {
   });
 };
 
+// Gets random question from database
+const getQuestion = (callback) => {
+  Question.QuestionModel.getRandomQuestion((err, docs) => {
+    if (err) {
+      return callback();
+    }
+    return callback(docs[0]);
+  });
+};
+
 module.exports.gamePage = gamePage;
 module.exports.getResult = getResult;
+module.exports.getQuestion = getQuestion;

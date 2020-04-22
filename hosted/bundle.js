@@ -44,19 +44,40 @@ var ChatWindow = function ChatWindow(props) {
 
 
 var ScoreWindow = function ScoreWindow(props) {
+  var scoreHTML = props.players.map(function (player) {
+    return /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("h3", null, player.username), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("h4", null, "Score: ", player.score))));
+  });
   return /*#__PURE__*/React.createElement("div", {
-    id: "scoreWindow"
-  }, /*#__PURE__*/React.createElement("h3", null, "Score: ", props.score), /*#__PURE__*/React.createElement("input", {
+    id: "scores"
+  }, /*#__PURE__*/React.createElement("ul", {
+    id: "scoreList"
+  }, scoreHTML), /*#__PURE__*/React.createElement("input", {
     type: "hidden",
     name: "_csrf",
     value: props.csrf
   }));
+}; // displays winners of game
+
+
+var GameOverWindow = function GameOverWindow(props) {
+  var i = 0;
+  var gameOverHTML = props.players.map(function (player) {
+    var suffix;
+    i++;
+    if (i == 1) suffix = "st";
+    if (i == 2) suffix = "nd";
+    if (i == 3) suffix = "rd";
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, i + suffix, " Place"), /*#__PURE__*/React.createElement("h3", null, player.username), /*#__PURE__*/React.createElement("h4", null, "Score: ", player.score));
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    id: "winnerList"
+  }, gameOverHTML);
 }; // Renders to page
 
 
 var setup = function setup(csrf) {
   ReactDOM.render( /*#__PURE__*/React.createElement(ScoreWindow, {
-    score: "0",
+    score: [],
     csrf: csrf
   }), document.querySelector("#scores"));
   ReactDOM.render( /*#__PURE__*/React.createElement(ChatWindow, {
@@ -66,9 +87,12 @@ var setup = function setup(csrf) {
 
 
 var submitAnswer = function submitAnswer(e) {
-  socket.emit('questionAnswered', {
-    question: questionText.textContent.substring(0, questionText.textContent.length - 1),
-    playerAnswer: e.target.textContent
+  sendAjax('GET', '/getUsername', null, function (result) {
+    socket.emit('questionAnswered', {
+      question: questionText.textContent.substring(0, questionText.textContent.length - 1),
+      playerAnswer: e.target.textContent,
+      username: result.username
+    });
   }); // remove events from buttons until next question
 
   var answerButtons = document.querySelectorAll("#answers div div");
@@ -90,13 +114,13 @@ var submitAnswer = function submitAnswer(e) {
 }; // Renders game window
 
 
-var loadGameWindow = function loadGameWindow() {
+var loadGameWindow = function loadGameWindow(q, a1, a2, a3, a4) {
   ReactDOM.render( /*#__PURE__*/React.createElement(GameWindow, {
-    question: testQuestion,
-    answer1: answer1,
-    answer2: answer2,
-    answer3: answer3,
-    answer4: answer4
+    question: q,
+    answer1: a1,
+    answer2: a2,
+    answer3: a3,
+    answer4: a4
   }), document.querySelector("#game")); // tie click events to answer buttons
 
   var answerButtons = document.querySelectorAll("#answers div div");
@@ -114,6 +138,16 @@ var loadGameWindow = function loadGameWindow() {
   } finally {
     _iterator2.f();
   }
+}; // Rerenders scores window
+
+
+var loadScoresWindow = function loadScoresWindow(players) {
+  sendAjax('GET', '/getToken', null, function (result) {
+    ReactDOM.render( /*#__PURE__*/React.createElement(ScoreWindow, {
+      players: players,
+      csrf: result.csrfToken
+    }), document.querySelector("#scores"));
+  });
 }; // Rerenders chat window
 
 
@@ -137,22 +171,52 @@ var getToken = function getToken() {
 var handleMessage = function handleMessage(msg) {
   chatLog.push(msg);
   loadChats();
-}; // Listen for players connecting
+}; // if server pins player send back username
 
 
-socket.on('playerConnected', function (object) {
-  handleMessage(object.msg);
+socket.on('pingUser', function (obj) {
+  sendAjax('GET', '/getUsername', null, function (result) {
+    socket.emit('userConnected', {
+      username: result.username,
+      score: 0,
+      socketid: socket.id
+    });
+    handleMessage("You have connected!");
+  });
+}); // Listen for other players connecting
 
-  if (object.numConnections == 2) {
-    loadGameWindow();
-  }
-});
+socket.on('pingPlayers', function (obj) {
+  loadScoresWindow(obj.playerList);
+  var lastPlayerConnected = obj.playerList[obj.playerList.length - 1];
+  if (lastPlayerConnected.socketid !== socket.id) handleMessage(lastPlayerConnected.username + " has connected!");
+}); // renders questions when needed
+
+socket.on('nextQuestion', function (q) {
+  loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
+}); // update user score when answer is processed
+
 socket.on('answer processed', function (object) {
   handleMessage(object.msg);
+
+  if (object.playerList) {
+    loadScoresWindow(object.playerList);
+  }
+}); // update other scores when any person answers a question
+
+socket.on('playerAnswered', function (object) {
+  loadScoresWindow(object.playerList);
+}); // render winners when game ends
+
+socket.on('gameOver', function (object) {
+  loadScoresWindow(object.playerList);
+  ReactDOM.render( /*#__PURE__*/React.createElement(GameOverWindow, {
+    players: object.playerList
+  }), document.querySelector("#game"));
 }); // Listen for players disconnectiong
 
 socket.on('socket disconnect', function (object) {
   handleMessage(object.msg);
+  loadScoresWindow(object.playerList);
 }); // Loads components on page load
 
 $(document).ready(function () {
@@ -161,8 +225,18 @@ $(document).ready(function () {
 "use strict";
 
 var handleError = function handleError(message) {
-  console.log(message);
   $("#errorMessage").text(message);
+  $("#error").animate({
+    width: 'hide'
+  }, 350);
+  $("#error").animate({
+    width: 'toggle'
+  }, 350);
+};
+
+var serverResponse = function serverResponse(response) {
+  console.log(response.message);
+  $("#errorMessage").text(response.message);
   $("#error").animate({
     width: 'hide'
   }, 350);

@@ -5,7 +5,7 @@ const answer3 = "Mercury";
 const answer4 = "Jupiter";
 
 // holds clients chat log
-let chatLog = [];
+const chatLog = [];
 
 // initialize socket
 const socket = io();
@@ -46,10 +46,50 @@ const ChatWindow = (props) => {
 
 // displays user's score
 const ScoreWindow = (props) => {
+	const scoreHTML = props.players.map((player) => {
+		return (
+			<li>
+				<h3>{player.username}</h3>
+				<ul>
+					<li><h4>Score: {player.score}</h4></li>
+				</ul>
+			</li>
+		);
+	});
+	
 	return (
-		<div id="scoreWindow">
-			<h3>Score: {props.score}</h3>
+		<div id="scores">
+			<ul id="scoreList">
+				{scoreHTML}
+			</ul>
 			<input type="hidden" name="_csrf" value={props.csrf} />
+		</div>
+	);
+};
+
+// displays winners of game
+const GameOverWindow = (props) => {
+	let i = 0;
+	const gameOverHTML = props.players.map((player) => {
+		let suffix;
+		i++;
+		
+		if(i == 1) suffix = "st";
+		if(i == 2) suffix = "nd";
+		if(i == 3) suffix = "rd";
+		
+		return (
+			<div>
+				<h2>{i + suffix} Place</h2>
+				<h3>{player.username}</h3>
+				<h4>Score: {player.score}</h4>
+			</div>
+		);
+	});
+	
+	return (
+		<div id="winnerList">
+			{gameOverHTML}
 		</div>
 	);
 };
@@ -57,7 +97,7 @@ const ScoreWindow = (props) => {
 // Renders to page
 const setup = (csrf) => {	
 	ReactDOM.render(
-		<ScoreWindow score="0" csrf={csrf} />,
+		<ScoreWindow score={[]} csrf={csrf} />,
 		document.querySelector("#scores")
 	);
 	
@@ -69,9 +109,13 @@ const setup = (csrf) => {
 
 // Submits answer to socket
 const submitAnswer = (e) => {
-	socket.emit('questionAnswered', {
-		question: questionText.textContent.substring(0, questionText.textContent.length - 1),
-		playerAnswer: e.target.textContent,
+	sendAjax('GET', '/getUsername', null, (result) => {
+		
+		socket.emit('questionAnswered', {
+		  question: questionText.textContent.substring(0, questionText.textContent.length - 1),
+		  playerAnswer: e.target.textContent,
+		  username: result.username,
+	    });
 	});
 	
 	// remove events from buttons until next question
@@ -83,9 +127,9 @@ const submitAnswer = (e) => {
 };
 
 // Renders game window
-const loadGameWindow = () => {
+const loadGameWindow = (q, a1, a2, a3, a4) => {
 	ReactDOM.render(
-		<GameWindow question={testQuestion} answer1={answer1} answer2={answer2} answer3={answer3} answer4={answer4} />,
+		<GameWindow question={q} answer1={a1} answer2={a2} answer3={a3} answer4={a4} />,
 		document.querySelector("#game")
 	);
 	
@@ -95,6 +139,16 @@ const loadGameWindow = () => {
 	for(let button of answerButtons) {
 		button.onclick = submitAnswer;
 	}
+};
+
+// Rerenders scores window
+const loadScoresWindow = (players) => {
+	sendAjax('GET', '/getToken', null, (result) => {
+		ReactDOM.render(
+			<ScoreWindow players={players} csrf={result.csrfToken} />,
+			document.querySelector("#scores")
+		);
+	});
 };
 
 // Rerenders chat window
@@ -122,22 +176,61 @@ const handleMessage = (msg) => {
 	loadChats();
 }
 
-// Listen for players connecting
-socket.on('playerConnected', (object) => {
+// if server pins player send back username
+socket.on('pingUser', (obj) => {
+	sendAjax('GET', '/getUsername', null, (result) => {
+		socket.emit('userConnected', { 
+			username: result.username,
+			score: 0,
+			socketid: socket.id,
+		});
+		
+		handleMessage("You have connected!");
+	});
+});
+
+// Listen for other players connecting
+socket.on('pingPlayers', (obj) => {
+	loadScoresWindow(obj.playerList);
+	
+	const lastPlayerConnected = obj.playerList[obj.playerList.length - 1];
+	
+	if(lastPlayerConnected.socketid !== socket.id) handleMessage(lastPlayerConnected.username + " has connected!");	
+});
+
+// renders questions when needed
+socket.on('nextQuestion', (q) => {
+	loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
+});
+
+// update user score when answer is processed
+socket.on('answer processed', (object) => {
 	handleMessage(object.msg);
 	
-	if(object.numConnections == 2) {
-		loadGameWindow();
+	if(object.playerList) {
+		loadScoresWindow(object.playerList);
 	}
 });
 
-socket.on('answer processed', (object) => {
-	handleMessage(object.msg);
+// update other scores when any person answers a question
+socket.on('playerAnswered', (object) => {
+	loadScoresWindow(object.playerList);
+});
+
+// render winners when game ends
+socket.on('gameOver', (object) => {
+	loadScoresWindow(object.playerList);
+	
+	ReactDOM.render(
+		<GameOverWindow players={object.playerList} />,
+		document.querySelector("#game")
+	);
 });
 
 // Listen for players disconnectiong
 socket.on('socket disconnect', (object) => {
     handleMessage(object.msg);
+	loadScoresWindow(object.playerList);
 });
 
 // Loads components on page load

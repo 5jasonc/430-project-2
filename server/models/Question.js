@@ -43,7 +43,7 @@ const QuestionSchema = new mongoose.Schema({
   },
 });
 
-// RETURN ACCOUNT DATA
+// RETURN QUESTION DATA
 QuestionSchema.statics.toAPI = (doc) => ({
   question: doc.question,
   answer1: doc.answer1,
@@ -53,8 +53,7 @@ QuestionSchema.statics.toAPI = (doc) => ({
   correctAnswer: doc.correctAnswer,
 });
 
-
-// RETURNS ACCOUNT WHOS USERNAME MATCHES NAME ARGUMENT
+// RETURNS QUESTION WHOS question MATCHES q ARGUMENT
 QuestionSchema.statics.findByQuestion = (q, callback) => {
   const search = {
     question: q,
@@ -63,6 +62,16 @@ QuestionSchema.statics.findByQuestion = (q, callback) => {
   return QuestionModel.findOne(search, callback);
 };
 
+// GET RANDOM QUESTION FROM DB
+QuestionSchema.statics.getRandomQuestion = (callback) => {
+  const query = {
+    $sample: { size: 1 },
+  };
+
+  return QuestionModel.aggregate([query], callback);
+};
+
+// SAVE MODEL
 QuestionModel = mongoose.model('Question', QuestionSchema);
 
 module.exports.QuestionModel = QuestionModel;

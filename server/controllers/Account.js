@@ -41,6 +41,7 @@ const signup = (request, response) => {
   const req = request;
   const res = response;
 
+  // cast to string for security reasons
   req.body.username = `${req.body.username}`;
   req.body.pass = `${req.body.pass}`;
   req.body.pass2 = `${req.body.pass2}`;

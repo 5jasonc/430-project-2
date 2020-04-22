@@ -1,6 +1,13 @@
 const handleError = (message) => {
-	console.log(message);
 	$("#errorMessage").text(message);
+
+	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({width: 'toggle'}, 350);
+};
+
+const serverResponse = (response) => {
+	console.log(response.message);
+	$("#errorMessage").text(response.message);
 	$("#error").animate({width: 'hide'}, 350);
 	$("#error").animate({width: 'toggle'}, 350);
 };

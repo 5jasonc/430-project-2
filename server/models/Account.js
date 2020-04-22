@@ -25,6 +25,11 @@ const AccountSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  isAdmin: {
+    type: Boolean,
+    required: true,
+    default: false,
+  },
   score: {
     type: Number,
     min: 0,
@@ -49,6 +54,7 @@ AccountSchema.statics.toAPI = (doc) => ({
   _id: doc._id,
   score: doc.score,
   gamesWon: doc.gamesWon,
+  isAdmin: doc.isAdmin,
 });
 
 // VALIDATE INPUTTED PASSWORD
@@ -108,6 +114,9 @@ AccountSchema.statics.authenticate = (username, password, callback) => {
     });
   });
 };
+
+// ADDS SCORE TO AN ACCOUNT
+
 
 AccountModel = mongoose.model('Account', AccountSchema);
 

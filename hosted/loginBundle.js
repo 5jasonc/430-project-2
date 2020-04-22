@@ -149,8 +149,18 @@ $(document).ready(function () {
 "use strict";
 
 var handleError = function handleError(message) {
-  console.log(message);
   $("#errorMessage").text(message);
+  $("#error").animate({
+    width: 'hide'
+  }, 350);
+  $("#error").animate({
+    width: 'toggle'
+  }, 350);
+};
+
+var serverResponse = function serverResponse(response) {
+  console.log(response.message);
+  $("#errorMessage").text(response.message);
   $("#error").animate({
     width: 'hide'
   }, 350);

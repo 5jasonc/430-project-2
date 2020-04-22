@@ -98,28 +98,65 @@ const server = app.listen(port, (err) => {
 // CONFIGURE SOCKET IO AND GAME SETTINGS
 const io = socketIO(server);
 
+// import app controller to get some functions
 const game = require('./controllers/App.js');
 
+// required game variables
 let numConnections = 0;
+let questionNum = 0;
 let numUsersAnswered = 0;
+const maxPlayers = 2;
+const maxQuestions = 5;
+let playerList = [];
 
-// On socket connect
+// Gets a random question from database as JSON object
+const getQuestionObj = (callback) => {
+  game.getQuestion((object) => {
+    if (!object) return {};
+
+    return callback(object);
+  });
+};
+
+// SET UP SERVER SIDE LISTENING FOR EACH SOCKET ON CONNECT
 const onConnection = (socket) => {
   numConnections++;
 
-  const message = `Guest${numConnections} has connected.`;
-
-  io.sockets.emit('playerConnected', {
-    msg: message,
+  // Ping user
+  socket.emit('pingUser', {
     numConnections,
   });
 
+  // If user pings back, update all user's screens
+  socket.on('userConnected', (object) => {
+    playerList.push(object);
+    io.sockets.emit('pingPlayers', { playerList });
+  });
+
+  // starts game and sends 1st question if player limit is reached
+  if (numConnections >= maxPlayers) {
+    getQuestionObj((object) => {
+      io.sockets.emit('nextQuestion', object);
+    });
+  }
+
   // On socket disconnect
   socket.on('disconnect', () => {
-    console.log(`Guest${numConnections} has disconnected.`);
+    let playerUsername;
 
+    // delete disconnecting player from player list, save username
+    playerList = playerList.filter((player) => {
+      if (player.socketid === socket.id) {
+        playerUsername = player.username;
+        return false;
+      }
+      return true;
+    });
+
+    // ping other players when a user disconnects
     io.sockets.emit('socket disconnect', {
-      msg: `Guest${numConnections} has disconnected.`,
+      msg: `${playerUsername} has disconnected.`,
+      playerList,
     });
 
     numConnections--;
@@ -128,51 +165,53 @@ const onConnection = (socket) => {
   // On submitted answer
   socket.on('questionAnswered', (object) => {
     numUsersAnswered++;
-    if (numUsersAnswered >= numConnections) numUsersAnswered = 0;
 
+    // get whether answer was correct or not and inform user
     game.getResult(object.question, object.playerAnswer, (result) => {
-      if (result) {
-        socket.emit('answer processed', {
-          msg: `The answer ${object.playerAnswer} was correct!`,
-        });
-      } else {
+      if (result) { // if player is right
+        for (let i = 0; i < playerList.length; i++) {
+          if (playerList[i].username === object.username) {
+            playerList[i].score += 100;
+
+            socket.emit('answer processed', {
+              msg: `The answer ${object.playerAnswer} was correct!`,
+            });
+          }
+        }
+      } else { // if player is wrong
         socket.emit('answer processed', {
           msg: `The answer ${object.playerAnswer} was incorrect!`,
         });
       }
-    });
-  });
 
-  console.log(message);
-};
+      // ping back playerList with updated scores to update players' UI
+      io.sockets.emit('playerAnswered', { playerList });
 
-// LISTEN FOR CONNECTIONS AND MESSAGES
-io.sockets.on('connection', onConnection);
+      // if every user connected has answered go to next question
+      if (numUsersAnswered >= numConnections) {
+        numUsersAnswered = 0;
+        questionNum++;
 
-/*   socket.on('answer submitted', (answer) => {
-      console.log(`User submitted the answer: ${answer}`);
+        // sort playerList based on highest score
+        // code taken from here: https://flaviocopes.com/how-to-sort-array-of-objects-by-property-javascript/
+        playerList.sort((a, b) => ((a.score < b.score) ? 1 : -1));
 
-      // If answer correct
-      if (answer === questionData[questionKey].correctAnswer) {
-        const account = Account.AccountModel.findByUsername(req.session.account.username, () => {
-          account.score += 10;
-
-          const savePromise = account.save();
-
-          savePromise.then(() => {
-            socket.emit('correctAnswer', 'Correct!');
+        // if number of rounds in game has reached max end game
+        if (questionNum >= maxQuestions) {
+          io.sockets.emit('gameOver', {
+            playerList,
           });
 
-          savePromise.catch((err) => {
-            console.log(err);
-
-            return res.status(400).json({ error: 'Error submitting answer' });
+          questionNum = 0;
+        } else { // otherwise send next question to players
+          getQuestionObj((qObject) => {
+            io.sockets.emit('nextQuestion', qObject);
           });
-        });
-      } else {
-        console.log(questionData[questionKey].correctAnswer);
-
-        socket.emit('wrongAnswer', 'Wrong Answer!');
+        }
       }
     });
-  }); */
+  });
+};
+
+// LISTEN FOR CONNECTIONS
+io.sockets.on('connection', onConnection);
