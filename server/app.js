@@ -109,6 +109,8 @@ const maxPlayers = 2;
 const maxQuestions = 5;
 let playerList = [];
 
+let questionCountdown;
+
 // Gets a random question from database as JSON object
 const getQuestionObj = (callback) => {
   game.getQuestion((object) => {
@@ -117,6 +119,24 @@ const getQuestionObj = (callback) => {
     return callback(object);
   });
 };
+
+// starts the timer
+const startTimer = () => {
+  let counter = 10;
+
+  if (questionCountdown === undefined) {
+    questionCountdown = setInterval(() => {
+      io.sockets.emit('countdownTick', { timeLeft: counter });
+      counter--;
+
+      /* if (counter < 0 || numUsersAnswered >= numConnections) {
+        clearInterval(questionCountdown);
+        questionCountdown = undefined;
+      } */
+    }, 1000);
+  }
+};
+
 
 // SET UP SERVER SIDE LISTENING FOR EACH SOCKET ON CONNECT
 const onConnection = (socket) => {
@@ -137,6 +157,7 @@ const onConnection = (socket) => {
   if (numConnections >= maxPlayers) {
     getQuestionObj((object) => {
       io.sockets.emit('nextQuestion', object);
+      startTimer();
     });
   }
 
@@ -178,6 +199,10 @@ const onConnection = (socket) => {
             });
           }
         }
+      } else if (result === null) { // if player runs out of time
+        socket.emit('answer processed', {
+          msg: 'You ran out of time!',
+        });
       } else { // if player is wrong
         socket.emit('answer processed', {
           msg: `The answer ${object.playerAnswer} was incorrect!`,
@@ -192,20 +217,24 @@ const onConnection = (socket) => {
         numUsersAnswered = 0;
         questionNum++;
 
-        // sort playerList based on highest score
-        // code taken from here: https://flaviocopes.com/how-to-sort-array-of-objects-by-property-javascript/
-        playerList.sort((a, b) => ((a.score < b.score) ? 1 : -1));
-
         // if number of rounds in game has reached max end game
         if (questionNum >= maxQuestions) {
+          // sort playerList based on highest score
+          // code taken from here: https://flaviocopes.com/how-to-sort-array-of-objects-by-property-javascript/
+          playerList.sort((a, b) => ((a.score < b.score) ? 1 : -1));
+
           io.sockets.emit('gameOver', {
             playerList,
           });
-
+          clearInterval(questionCountdown);
+          questionCountdown = undefined;
           questionNum = 0;
         } else { // otherwise send next question to players
           getQuestionObj((qObject) => {
             io.sockets.emit('nextQuestion', qObject);
+            clearInterval(questionCountdown);
+            questionCountdown = undefined;
+            startTimer();
           });
         }
       }

@@ -6,15 +6,15 @@ function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o =
 
 function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
 
-var testQuestion = "Which is the hottest planet";
-var answer1 = "Saturn";
-var answer2 = "Venus";
-var answer3 = "Mercury";
-var answer4 = "Jupiter"; // holds clients chat log
-
+// holds clients chat log
 var chatLog = []; // initialize socket
 
-var socket = io(); // renders game window
+var socket = io(); // renders countdown window
+
+var CountdownWindow = function CountdownWindow(props) {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, "Time Left: ", props.timeLeft));
+}; // renders game window
+
 
 var GameWindow = function GameWindow(props) {
   return /*#__PURE__*/React.createElement("div", {
@@ -111,7 +111,7 @@ var submitAnswer = function submitAnswer(e) {
   } finally {
     _iterator.f();
   }
-}; // Renders game window
+}; // Load game window
 
 
 var loadGameWindow = function loadGameWindow(q, a1, a2, a3, a4) {
@@ -138,7 +138,14 @@ var loadGameWindow = function loadGameWindow(q, a1, a2, a3, a4) {
   } finally {
     _iterator2.f();
   }
-}; // Rerenders scores window
+}; // Load countdown window
+
+
+var loadCountdownWindow = function loadCountdownWindow(timeLeft) {
+  ReactDOM.render( /*#__PURE__*/React.createElement(CountdownWindow, {
+    timeLeft: timeLeft
+  }), document.querySelector("#countdown"));
+}; // Load scores window
 
 
 var loadScoresWindow = function loadScoresWindow(players) {
@@ -148,7 +155,7 @@ var loadScoresWindow = function loadScoresWindow(players) {
       csrf: result.csrfToken
     }), document.querySelector("#scores"));
   });
-}; // Rerenders chat window
+}; // Load chat window
 
 
 var loadChats = function loadChats() {
@@ -193,6 +200,21 @@ socket.on('pingPlayers', function (obj) {
 
 socket.on('nextQuestion', function (q) {
   loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
+}); // updates countdown timer
+// if timer out tell server player ran out of time
+
+socket.on('countdownTick', function (obj) {
+  loadCountdownWindow(obj.timeLeft);
+
+  if (obj.timeLeft <= 0) {
+    sendAjax('GET', '/getUsername', null, function (result) {
+      socket.emit('questionAnswered', {
+        question: questionText.textContent.substring(0, questionText.textContent.length - 1),
+        playerAnswer: null,
+        username: result.username
+      });
+    });
+  }
 }); // update user score when answer is processed
 
 socket.on('answer processed', function (object) {

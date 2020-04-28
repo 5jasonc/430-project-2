@@ -1,14 +1,17 @@
-const testQuestion = "Which is the hottest planet";
-const answer1 = "Saturn";
-const answer2 = "Venus";
-const answer3 = "Mercury";
-const answer4 = "Jupiter";
-
 // holds clients chat log
 const chatLog = [];
 
 // initialize socket
 const socket = io();
+
+// renders countdown window
+const CountdownWindow = (props) => {
+	return (
+		<div>
+			<h2>Time Left: {props.timeLeft}</h2>
+		</div>
+	);
+};
 
 // renders game window
 const GameWindow = (props) => {
@@ -126,7 +129,7 @@ const submitAnswer = (e) => {
 	}
 };
 
-// Renders game window
+// Load game window
 const loadGameWindow = (q, a1, a2, a3, a4) => {
 	ReactDOM.render(
 		<GameWindow question={q} answer1={a1} answer2={a2} answer3={a3} answer4={a4} />,
@@ -141,7 +144,15 @@ const loadGameWindow = (q, a1, a2, a3, a4) => {
 	}
 };
 
-// Rerenders scores window
+// Load countdown window
+const loadCountdownWindow = (timeLeft) => {
+	ReactDOM.render(
+		<CountdownWindow timeLeft={timeLeft} />,
+		document.querySelector("#countdown")
+	);
+};
+
+// Load scores window
 const loadScoresWindow = (players) => {
 	sendAjax('GET', '/getToken', null, (result) => {
 		ReactDOM.render(
@@ -151,7 +162,7 @@ const loadScoresWindow = (players) => {
 	});
 };
 
-// Rerenders chat window
+// Load chat window
 const loadChats = () => {
 	ReactDOM.render(
 		<ChatWindow chat={chatLog} />,
@@ -201,6 +212,22 @@ socket.on('pingPlayers', (obj) => {
 // renders questions when needed
 socket.on('nextQuestion', (q) => {
 	loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
+});
+
+// updates countdown timer
+// if timer out tell server player ran out of time
+socket.on('countdownTick', (obj) => {
+	loadCountdownWindow(obj.timeLeft);
+	
+	if(obj.timeLeft <= 0) {
+		sendAjax('GET', '/getUsername', null, (result) => {
+			socket.emit('questionAnswered', {
+			  question: questionText.textContent.substring(0, questionText.textContent.length - 1),
+			  playerAnswer: null,
+			  username: result.username,
+			});
+		});
+	}
 });
 
 // update user score when answer is processed

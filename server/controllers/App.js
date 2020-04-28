@@ -14,6 +14,9 @@ const getResult = (question, playerAnswer, callback) => {
     if (playerAnswer === doc.correctAnswer) {
       return callback(true);
     }
+    if (playerAnswer === null) {
+      return callback(null);
+    }
     return callback(false);
   });
 };
