@@ -57,7 +57,7 @@ AccountSchema.statics.toAPI = (doc) => ({
   isAdmin: doc.isAdmin,
 });
 
-// VALIDATE INPUTTED PASSWORD
+// VALIDATE INPUTED PASSWORD
 const validatePassword = (doc, password, callback) => {
   const pass = doc.password;
 
@@ -113,6 +113,16 @@ AccountSchema.statics.authenticate = (username, password, callback) => {
       return callback();
     });
   });
+};
+
+// Changes password for user in database
+AccountSchema.statics.changePassword = (doc, newHash, salt, callback) => {
+  const query = {
+    password: newHash,
+    salt,
+  };
+  return AccountModel.updateOne({ username: doc.username }, query, { multi: false }, callback);
+  // return callback(AccountModel.findOneAndUpdate({ username: doc.username }, query));
 };
 
 // ADDS SCORE TO AN ACCOUNT

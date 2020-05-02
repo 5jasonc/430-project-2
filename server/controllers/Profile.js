@@ -22,7 +22,41 @@ const getProfile = (request, response) => {
   });
 };
 
-// returns user name of player who gets request
+// CHANGES CURRENT USERS PASSWORD
+const changePassword = (request, response) => {
+  const req = request;
+  const res = response;
+
+  // cast to string for security reasons
+  req.body.currentPass = `${req.body.currentPass}`;
+  req.body.newPass = `${req.body.newPass}`;
+  req.body.newPass2 = `${req.body.newPass2}`;
+
+  if (!req.body.currentPass || !req.body.newPass || !req.body.newPass2) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  if (req.body.newPass !== req.body.newPass2) {
+    return res.status(400).json({ error: 'New passwords must match' });
+  }
+
+  return Account.AccountModel.authenticate(req.session.account.username,
+    req.body.currentPass,
+    (err, doc) => {
+      if (err || !doc) return res.status(401).json({ error: 'Wrong password' });
+
+      return Account.AccountModel.generateHash(req.body.newPass, (salt, hash) => {
+        if (!salt || !hash) return res.status(500).json({ error: 'Server failed to generate hash' });
+
+        return Account.AccountModel.changePassword(doc, hash, salt, (error, acc) => {
+          if (error || !acc) return res.status(500).json({ error: 'Server failed to update password' });
+          return res.status(204).json();
+        });
+      });
+    });
+};
+
+// RETURNS USERNAME OF USER WHO ISSUES REQUEST
 const getUsername = (req, res) => res.json({ username: req.session.account.username });
 
 // ADDS A QUESTION TO DB
@@ -64,10 +98,7 @@ const submitQuestion = (request, response) => {
 
   const savePromise = newQuestion.save();
 
-  savePromise.then(() => {
-    console.log('question submitted');
-    return res.json({ message: 'Question submitted successfully!' });
-  });
+  savePromise.then(() => res.json({ message: 'Question submitted successfully!' }));
 
   savePromise.catch((err) => {
     console.log(err);
@@ -85,4 +116,5 @@ const submitQuestion = (request, response) => {
 module.exports.profilePage = profilePage;
 module.exports.getProfile = getProfile;
 module.exports.getUsername = getUsername;
+module.exports.changePassword = changePassword;
 module.exports.submitQuestion = submitQuestion;

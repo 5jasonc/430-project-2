@@ -363,7 +363,6 @@ var handleError = function handleError(message) {
 };
 
 var serverResponse = function serverResponse(response) {
-  console.log(response.message);
   $("#errorMessage").text(response.message);
   $("#error").animate({
     width: 'hide'

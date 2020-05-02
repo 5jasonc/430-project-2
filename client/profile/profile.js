@@ -3,8 +3,7 @@
 const loadAccount = () => {
 	sendAjax('GET', '/getProfile', null, (data) => {
 		ReactDOM.render(
-			<ProfileWindow csrf={data.csrfToken}
-						   username={data.account.username} 
+			<ProfileWindow username={data.account.username} 
 						   score={data.account.score} 
 						   gamesWon={data.account.gamesWon} />,
 			document.querySelector("#content")
@@ -12,10 +11,7 @@ const loadAccount = () => {
 		
 		// if user is admin display question submit window
 		if(data.account.isAdmin) {
-			ReactDOM.render(
-				<QuestionSubmitWindow csrf={data.csrfToken} />,
-				document.querySelector("#questionSubmit")
-			);
+			loadQuestionSubmitWindow(data.csrfToken);
 		}
 	});
 };
@@ -56,7 +52,28 @@ const handleQuestionSubmit = (e) => {
 		handleError(message.message);
 	});
 	
-	return true;
+	return false;
+};
+
+// handles user password change
+const handlePassChange = (e) => {
+	e.preventDefault();
+	
+	$("#error").animate({width: 'hide'}, 350);
+	
+	if($("#currentPass").val() == '' || $("#newPass").val() == '' || $("#newPass2").val() == '') {
+		handleError("All fields are required");
+		return false;
+	}
+	
+	if($("#newPass").val() !== $("#newPass2").val()) {
+		handleError("New passwords do not match");
+		return false;
+	}
+	
+	sendAjax('POST', $("#passChangeForm").attr("action"), $("#passChangeForm").serialize(), () => handleError('Password changed successfully'));
+	
+	return false;
 };
 
 // renders client's username, score, and games won
@@ -65,11 +82,27 @@ const ProfileWindow = (props) => {
 		<div id="profileWindow">
 			<div id="profileStats">
 				<h2 id="profileName">{props.username}</h2>
-				<h4 class="profileScore">Score: {props.score}</h4>
-				<h4 class="profileScore">Games Won: {props.gamesWon}</h4>
+				<h4 className="profileScore">Score: {props.score}</h4>
+				<h4 className="profileScore">Games Won: {props.gamesWon}</h4>
 			</div>
-			<input type="hidden" name="_csrf" value={props.csrf} />
 		</div>
+	);
+};
+
+const PasswordChangeWindow = (props) => {
+	return (
+		<form id="passChangeForm" name="passChangeForm" onSubmit={handlePassChange} action="/passChange" method="POST" className="mainForm">
+			<label htmlFor="currentPass">Current Password: </label>
+			<input id="currentPass" type="password" name="currentPass" placeholder="current password" />
+			<label htmlFor="newPass">New Password: </label>
+			<input id="newPass" type="password" name="newPass" placeholder="new password" />
+			<label htmlFor="newPass2">Re-type New Password: </label>
+			<input id="newPass2" type="password" name="newPass2" placeholder="new password" />
+
+			<input type="hidden" name="_csrf" value={props.csrf} />
+			
+			<input className="formSubmit" type="submit" value="Change Password" />
+		</form>
 	);
 };
 
@@ -100,13 +133,25 @@ const QuestionSubmitWindow = (props) => {
 	);
 };
 
+// load password change window
+const loadPassChangeWindow = (csrf) => {
+	ReactDOM.render(
+		<PasswordChangeWindow csrf={csrf} />,
+		document.querySelector("#passwordChange")
+	);
+};
+
+// load question submit window
+const loadQuestionSubmitWindow = (csrf) => {
+	ReactDOM.render(
+		<QuestionSubmitWindow csrf={csrf} />,
+		document.querySelector("#questionSubmit")
+	);
+};
+
 // load components
 const setup = (csrf) => {
-	ReactDOM.render(
-		<ProfileWindow csrf={csrf} />,
-		document.querySelector("#content")
-	);
-	
+	loadPassChangeWindow(csrf);
 	loadAccount();
 };
 

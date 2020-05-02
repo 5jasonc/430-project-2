@@ -11,7 +11,6 @@ var handleLogin = function handleLogin(e) {
     return false;
   }
 
-  console.log($("input[name=_csrf]").val());
   sendAjax('POST', $("#loginForm").attr("action"), $("#loginForm").serialize(), redirect);
   return false;
 };
@@ -159,7 +158,6 @@ var handleError = function handleError(message) {
 };
 
 var serverResponse = function serverResponse(response) {
-  console.log(response.message);
   $("#errorMessage").text(response.message);
   $("#error").animate({
     width: 'hide'
