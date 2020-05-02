@@ -101,15 +101,23 @@ const io = socketIO(server);
 // import app controller to get some functions
 const game = require('./controllers/App.js');
 
-// required game variables
-let numConnections = 0;
-let questionNum = 0;
-let numUsersAnswered = 0;
-const maxPlayers = 2;
-const maxQuestions = 5;
-let playerList = [];
+// list of rooms
+const roomList = {};
 
-let questionCountdown;
+// Adds room to room list object
+const addRoom = (room) => {
+  roomList[room.roomKey] = {
+    roomKey: room.roomKey,
+    roomName: room.roomName,
+    maxConnections: room.maxConnections,
+    questionNum: 0,
+    maxQuestions: room.maxQuestions,
+    numUsersAnswered: 0,
+    playerList: {},
+    questionCountdown: null,
+    isAvailable: true,
+  };
+};
 
 // Gets a random question from database as JSON object
 const getQuestionObj = (callback) => {
@@ -121,120 +129,124 @@ const getQuestionObj = (callback) => {
 };
 
 // starts the timer
-const startTimer = () => {
+const startTimer = (roomKey) => {
   let counter = 10;
 
-  if (questionCountdown === undefined) {
-    questionCountdown = setInterval(() => {
-      io.sockets.emit('countdownTick', { timeLeft: counter });
+  if (roomList[roomKey].questionCountdown === null) {
+    roomList[roomKey].questionCountdown = setInterval(() => {
+      io.to(roomKey).emit('countdownTick', counter);
       counter--;
 
-      /* if (counter < 0 || numUsersAnswered >= numConnections) {
-        clearInterval(questionCountdown);
-        questionCountdown = undefined;
-      } */
+      // if (counter < 0 || numUsersAnswered >= numConnections) {
+      // clearInterval(roomList[roomKey].questionCountdown);
+      // roomList[roomKey].questionCountdown = null;
+      // }
     }, 1000);
   }
 };
 
+const updateLobbyList = () => {
+  const lobbyList = Object.values(roomList).filter((room) => room.isAvailable);
+  io.to('lobby').emit('lobbyList', Object.values(lobbyList));
+};
 
 // SET UP SERVER SIDE LISTENING FOR EACH SOCKET ON CONNECT
 const onConnection = (socket) => {
-  numConnections++;
+// ping user with room list when they join
+  socket.join('lobby');
+  updateLobbyList();
 
-  // Ping user
-  socket.emit('pingUser', {
-    numConnections,
-  });
 
-  // If user pings back, update all user's screens
-  socket.on('userConnected', (object) => {
-    playerList.push(object);
-    io.sockets.emit('pingPlayers', { playerList });
-  });
+  // when user joins room ping user
+  socket.on('roomJoined', (connectData) => {
+    socket.leave('lobby');
+    socket.join(connectData.roomKey);
 
-  // starts game and sends 1st question if player limit is reached
-  if (numConnections >= maxPlayers) {
-    getQuestionObj((object) => {
-      io.sockets.emit('nextQuestion', object);
-      startTimer();
+    roomList[connectData.roomKey].playerList[socket.id] = connectData.player;
+
+    if (Object.keys(roomList[connectData.roomKey].playerList).length
+>= roomList[connectData.roomKey].maxConnections) {
+      roomList[connectData.roomKey].isAvailable = false;
+    }
+
+    updateLobbyList();
+
+    io.to(connectData.roomKey).emit('pingPlayers', {
+      room: roomList[connectData.roomKey],
+      player: connectData.player,
     });
-  }
+  });
 
-  // On socket disconnect
+  // when user creates their own room add to room list
+  socket.on('roomCreated', (room) => addRoom(room));
+
+  // when max players have been reached start game and sends 1st question if player limit is reached
+  socket.on('startGame', (room) => {
+    getQuestionObj((question) => {
+      startTimer(room.roomKey);
+      io.to(room.roomKey).emit('nextQuestion', question);
+    });
+  });
+
+  // on socket disconnect take out of playerList in room and ping other players
   socket.on('disconnect', () => {
-    let playerUsername;
+    Object.keys(roomList).forEach((room) => {
+      if (roomList[room].playerList[socket.id]) {
+        const disconnectingPlayer = roomList[room].playerList[socket.id];
+        delete roomList[room].playerList[socket.id];
 
-    // delete disconnecting player from player list, save username
-    playerList = playerList.filter((player) => {
-      if (player.socketid === socket.id) {
-        playerUsername = player.username;
-        return false;
+        updateLobbyList();
+
+        io.to(room).emit('socketDisconnect', {
+          player: disconnectingPlayer,
+          playerList: roomList[room].playerList,
+        });
       }
-      return true;
     });
-
-    // ping other players when a user disconnects
-    io.sockets.emit('socket disconnect', {
-      msg: `${playerUsername} has disconnected.`,
-      playerList,
-    });
-
-    numConnections--;
   });
 
-  // On submitted answer
+  // on submitted answer
   socket.on('questionAnswered', (object) => {
-    numUsersAnswered++;
+    roomList[object.roomKey].numUsersAnswered++;
 
     // get whether answer was correct or not and inform user
     game.getResult(object.question, object.playerAnswer, (result) => {
       if (result) { // if player is right
-        for (let i = 0; i < playerList.length; i++) {
-          if (playerList[i].username === object.username) {
-            playerList[i].score += 100;
-
-            socket.emit('answer processed', {
-              msg: `The answer ${object.playerAnswer} was correct!`,
-            });
-          }
-        }
+        roomList[object.roomKey].playerList[socket.id].score += 100;
+        socket.emit('answerProcessed', `The answer ${object.playerAnswer} was correct!`);
       } else if (result === null) { // if player runs out of time
-        socket.emit('answer processed', {
-          msg: 'You ran out of time!',
-        });
+        socket.emit('answerProcessed', 'You ran out of time!');
       } else { // if player is wrong
-        socket.emit('answer processed', {
-          msg: `The answer ${object.playerAnswer} was incorrect!`,
-        });
+        socket.emit('answerProcessed', `The answer ${object.playerAnswer} was incorrect!`);
       }
 
       // ping back playerList with updated scores to update players' UI
-      io.sockets.emit('playerAnswered', { playerList });
+      io.to(object.roomKey).emit('playerAnswered', roomList[object.roomKey].playerList);
 
       // if every user connected has answered go to next question
-      if (numUsersAnswered >= numConnections) {
-        numUsersAnswered = 0;
-        questionNum++;
+      if (roomList[object.roomKey].numUsersAnswered
+>= Object.keys(roomList[object.roomKey].playerList).length) {
+        roomList[object.roomKey].numUsersAnswered = 0;
+        roomList[object.roomKey].questionNum++;
 
         // if number of rounds in game has reached max end game
-        if (questionNum >= maxQuestions) {
+        if (roomList[object.roomKey].questionNum >= roomList[object.roomKey].maxQuestions) {
           // sort playerList based on highest score
-          // code taken from here: https://flaviocopes.com/how-to-sort-array-of-objects-by-property-javascript/
+          // code from here: https://flaviocopes.com/how-to-sort-array-of-objects-by-property-javascript/
+          const playerList = Object.values(roomList[object.roomKey].playerList).map((p) => p);
           playerList.sort((a, b) => ((a.score < b.score) ? 1 : -1));
 
-          io.sockets.emit('gameOver', {
-            playerList,
-          });
-          clearInterval(questionCountdown);
-          questionCountdown = undefined;
-          questionNum = 0;
+          clearInterval(roomList[object.roomKey].questionCountdown);
+          roomList[object.roomKey].questionCountdown = null;
+          io.to(object.roomKey).emit('countdownTick', null);
+          io.to(object.roomKey).emit('gameOver', playerList);
+          roomList[object.roomKey].questionNum = 0;
         } else { // otherwise send next question to players
           getQuestionObj((qObject) => {
-            io.sockets.emit('nextQuestion', qObject);
-            clearInterval(questionCountdown);
-            questionCountdown = undefined;
-            startTimer();
+            clearInterval(roomList[object.roomKey].questionCountdown);
+            roomList[object.roomKey].questionCountdown = null;
+            startTimer(object.roomKey);
+            io.to(object.roomKey).emit('nextQuestion', qObject);
           });
         }
       }

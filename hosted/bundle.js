@@ -6,17 +6,95 @@ function _unsupportedIterableToArray(o, minLen) { if (!o) return; if (typeof o =
 
 function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len = arr.length; for (var i = 0, arr2 = new Array(len); i < len; i++) { arr2[i] = arr[i]; } return arr2; }
 
-// holds clients chat log
+// holds client's chat log
 var chatLog = []; // initialize socket
 
-var socket = io(); // renders countdown window
+var socket = io(); // holds csrf token during game
+
+var CsrfWindow = function CsrfWindow(props) {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("input", {
+    type: "hidden",
+    name: "_csrf",
+    value: props.csrf
+  }));
+}; // renders lobby select window
+
+
+var LobbySelectWindow = function LobbySelectWindow(props) {
+  if (props.rooms === null) return /*#__PURE__*/React.createElement("div", null);
+  if (props.rooms.length <= 0) return /*#__PURE__*/React.createElement("div", {
+    id: "lobbyList"
+  }, /*#__PURE__*/React.createElement("h2", null, "No games found!"));
+  var lobbySelectHTML = props.rooms.map(function (room) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "lobby"
+    }, /*#__PURE__*/React.createElement("h3", null, room.roomName), /*#__PURE__*/React.createElement("p", null, "Players: ", Object.keys(room.playerList).length, "/", room.maxConnections), /*#__PURE__*/React.createElement("div", {
+      className: "button",
+      onClick: function onClick() {
+        return joinLobby(room.roomKey);
+      }
+    }, /*#__PURE__*/React.createElement("h3", null, "Join game")));
+  });
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, "Available Games"), /*#__PURE__*/React.createElement("div", {
+    id: "lobbyList"
+  }, lobbySelectHTML));
+}; // renders lobby create window
+
+
+var LobbyCreateWindow = function LobbyCreateWindow(props) {
+  if (!props.showWindow) return /*#__PURE__*/React.createElement("div", null);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    htmlFor: "roomNameText"
+  }, "Lobby Name: "), /*#__PURE__*/React.createElement("input", {
+    id: "roomNameText",
+    type: "text",
+    name: "roomNameText",
+    placeholder: "(must be under 20 characters)"
+  }), /*#__PURE__*/React.createElement("label", {
+    htmlFor: "maxPlayerSelect"
+  }, "Max Players: "), /*#__PURE__*/React.createElement("p", {
+    className: "hint"
+  }, "(The game starts when this number has been reached)"), /*#__PURE__*/React.createElement("select", {
+    id: "maxPlayerSelect",
+    name: "maxPlayerSelect"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "2",
+    selected: "selected"
+  }, "2"), /*#__PURE__*/React.createElement("option", {
+    value: "3"
+  }, "3"), /*#__PURE__*/React.createElement("option", {
+    value: "4"
+  }, "4"), /*#__PURE__*/React.createElement("option", {
+    value: "5"
+  }, "5")), /*#__PURE__*/React.createElement("label", {
+    htmlFor: "roundSelect"
+  }, "Number of rounds: "), /*#__PURE__*/React.createElement("select", {
+    id: "roundSelect",
+    name: "roundSelect"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "5",
+    selected: "selected"
+  }, "5"), /*#__PURE__*/React.createElement("option", {
+    value: "10"
+  }, "10"), /*#__PURE__*/React.createElement("option", {
+    value: "15"
+  }, "15"), /*#__PURE__*/React.createElement("option", {
+    value: "20"
+  }, "20")), /*#__PURE__*/React.createElement("div", {
+    className: "button",
+    onClick: createLobby
+  }, /*#__PURE__*/React.createElement("h3", null, "Create Lobby")));
+}; // renders countdown window
+
 
 var CountdownWindow = function CountdownWindow(props) {
+  if (props.timeLeft === null) return /*#__PURE__*/React.createElement("div", null);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, "Time Left: ", props.timeLeft));
 }; // renders game window
 
 
 var GameWindow = function GameWindow(props) {
+  if (props.question === null) return /*#__PURE__*/React.createElement("h2", null, "Waiting for players...");
   return /*#__PURE__*/React.createElement("div", {
     id: "gameWindow"
   }, /*#__PURE__*/React.createElement("div", {
@@ -34,7 +112,7 @@ var GameWindow = function GameWindow(props) {
 
 
 var ChatWindow = function ChatWindow(props) {
-  var chatHTML = chatLog.map(function (message) {
+  var chatHTML = props.chats.map(function (message) {
     return /*#__PURE__*/React.createElement("li", null, message);
   });
   return /*#__PURE__*/React.createElement("ul", {
@@ -44,6 +122,7 @@ var ChatWindow = function ChatWindow(props) {
 
 
 var ScoreWindow = function ScoreWindow(props) {
+  if (props.players === null) return /*#__PURE__*/React.createElement("div", null);
   var scoreHTML = props.players.map(function (player) {
     return /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("h3", null, player.username), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", null, /*#__PURE__*/React.createElement("h4", null, "Score: ", player.score))));
   });
@@ -51,11 +130,7 @@ var ScoreWindow = function ScoreWindow(props) {
     id: "scores"
   }, /*#__PURE__*/React.createElement("ul", {
     id: "scoreList"
-  }, scoreHTML), /*#__PURE__*/React.createElement("input", {
-    type: "hidden",
-    name: "_csrf",
-    value: props.csrf
-  }));
+  }, scoreHTML));
 }; // displays winners of game
 
 
@@ -67,33 +142,75 @@ var GameOverWindow = function GameOverWindow(props) {
     if (i == 1) suffix = "st";
     if (i == 2) suffix = "nd";
     if (i == 3) suffix = "rd";
+    if (i >= 4) suffix = "th";
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", null, i + suffix, " Place"), /*#__PURE__*/React.createElement("h3", null, player.username), /*#__PURE__*/React.createElement("h4", null, "Score: ", player.score));
   });
   return /*#__PURE__*/React.createElement("div", {
     id: "winnerList"
   }, gameOverHTML);
-}; // Renders to page
+}; // sends the socket information to create new lobby
 
 
-var setup = function setup(csrf) {
-  ReactDOM.render( /*#__PURE__*/React.createElement(ScoreWindow, {
-    score: [],
-    csrf: csrf
-  }), document.querySelector("#scores"));
-  ReactDOM.render( /*#__PURE__*/React.createElement(ChatWindow, {
-    chat: chatLog
-  }), document.querySelector("#chat"));
+var createLobby = function createLobby() {
+  if (roomNameText.value === '') return handleError('Room name is required');
+  if (roomNameText.value.length >= 20) return handleError('Room name too long');
+  var newRoom = {
+    // room key creation taken from Xuejia Chen here: https://gist.github.com/6174/6062387
+    roomKey: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+    roomName: roomNameText.value.replace(/[^a-z0-9 ]/gim, "").trim(),
+    maxConnections: parseInt(maxPlayerSelect.options[maxPlayerSelect.selectedIndex].value),
+    maxQuestions: parseInt(roundSelect.options[roundSelect.selectedIndex].value)
+  };
+  socket.emit('roomCreated', newRoom);
+  joinLobby(newRoom.roomKey);
+}; // connect client to socket of lobby and send server player connect info
+
+
+var joinLobby = function joinLobby(roomKey) {
+  sendAjax('GET', '/getUsername', null, function (result) {
+    socket.emit('roomJoined', {
+      roomKey: roomKey,
+      player: {
+        username: result.username,
+        score: 0,
+        socketid: socket.id
+      }
+    });
+    roomKeyInput.value = roomKey;
+    loadGameWindow(null, null, null, null, null);
+    loadLobbyWindow(null);
+    loadLobbyCreateWindow(false);
+  });
+}; // load lobby window
+
+
+var loadLobbyWindow = function loadLobbyWindow(rooms) {
+  ReactDOM.render( /*#__PURE__*/React.createElement(LobbySelectWindow, {
+    rooms: rooms
+  }), document.querySelector("#lobbySelect"));
+};
+
+var loadLobbyCreateWindow = function loadLobbyCreateWindow(showWindow) {
+  ReactDOM.render( /*#__PURE__*/React.createElement(LobbyCreateWindow, {
+    showWindow: showWindow
+  }), document.querySelector("#lobbyCreate"));
 }; // Submits answer to socket
 
 
-var submitAnswer = function submitAnswer(e) {
+var submitAnswer = function submitAnswer(playerAnswer) {
   sendAjax('GET', '/getUsername', null, function (result) {
     socket.emit('questionAnswered', {
       question: questionText.textContent.substring(0, questionText.textContent.length - 1),
-      playerAnswer: e.target.textContent,
-      username: result.username
+      playerAnswer: playerAnswer,
+      username: result.username,
+      roomKey: roomKeyInput.value
     });
-  }); // remove events from buttons until next question
+  });
+}; // Handles when answer button is clicked
+
+
+var handleAnswer = function handleAnswer(e) {
+  submitAnswer(e.target.textContent); // remove events from buttons until next question
 
   var answerButtons = document.querySelectorAll("#answers div div");
 
@@ -115,6 +232,9 @@ var submitAnswer = function submitAnswer(e) {
 
 
 var loadGameWindow = function loadGameWindow(q, a1, a2, a3, a4) {
+  $("#error").animate({
+    width: 'hide'
+  }, 350);
   ReactDOM.render( /*#__PURE__*/React.createElement(GameWindow, {
     question: q,
     answer1: a1,
@@ -131,7 +251,7 @@ var loadGameWindow = function loadGameWindow(q, a1, a2, a3, a4) {
   try {
     for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
       var button = _step2.value;
-      button.onclick = submitAnswer;
+      button.onclick = handleAnswer;
     }
   } catch (err) {
     _iterator2.e(err);
@@ -149,28 +269,28 @@ var loadCountdownWindow = function loadCountdownWindow(timeLeft) {
 
 
 var loadScoresWindow = function loadScoresWindow(players) {
-  sendAjax('GET', '/getToken', null, function (result) {
-    ReactDOM.render( /*#__PURE__*/React.createElement(ScoreWindow, {
-      players: players,
-      csrf: result.csrfToken
-    }), document.querySelector("#scores"));
-  });
+  ReactDOM.render( /*#__PURE__*/React.createElement(ScoreWindow, {
+    players: players
+  }), document.querySelector("#scores"));
 }; // Load chat window
 
 
 var loadChats = function loadChats() {
   ReactDOM.render( /*#__PURE__*/React.createElement(ChatWindow, {
-    chat: chatLog
+    chats: chatLog
   }), document.querySelector("#chat")); // Keeps chat window scrolled all the way down
   // code taken from Jeremy Ruten here: https://stackoverflow.com/questions/270612/scroll-to-bottom-of-div
 
   chat.scrollTop = chat.scrollHeight;
-}; // Gets client csrf token
+}; // Gets and loads client csrf token
 
 
 var getToken = function getToken() {
   sendAjax('GET', '/getToken', null, function (result) {
-    setup(result.csrfToken);
+    ReactDOM.render( /*#__PURE__*/React.createElement(CsrfWindow, {
+      csrf: result.csrfToken
+    }), document.querySelector("#csrfWindow"));
+    loadLobbyCreateWindow(true);
   });
 }; // Handle message to client
 
@@ -178,67 +298,53 @@ var getToken = function getToken() {
 var handleMessage = function handleMessage(msg) {
   chatLog.push(msg);
   loadChats();
-}; // if server pins player send back username
+}; // loads and renders lobby list when users connects to socket
 
 
-socket.on('pingUser', function (obj) {
-  sendAjax('GET', '/getUsername', null, function (result) {
-    socket.emit('userConnected', {
-      username: result.username,
-      score: 0,
-      socketid: socket.id
-    });
-    handleMessage("You have connected!");
-  });
+socket.on('lobbyList', function (roomList) {
+  return loadLobbyWindow(roomList);
 }); // Listen for other players connecting
 
-socket.on('pingPlayers', function (obj) {
-  loadScoresWindow(obj.playerList);
-  var lastPlayerConnected = obj.playerList[obj.playerList.length - 1];
-  if (lastPlayerConnected.socketid !== socket.id) handleMessage(lastPlayerConnected.username + " has connected!");
+socket.on('pingPlayers', function (connectData) {
+  // tell user if they or another player connects
+  if (connectData.player.socketid === socket.id) handleMessage("You have connected!");else {
+    handleMessage(connectData.player.username + " has connected!");
+  } // start game if max connections reached
+
+  if (Object.keys(connectData.room.playerList).length >= connectData.room.maxConnections) {
+    loadScoresWindow(Object.values(connectData.room.playerList));
+    socket.emit('startGame', connectData.room);
+  }
 }); // renders questions when needed
 
 socket.on('nextQuestion', function (q) {
-  loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
+  return loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
 }); // updates countdown timer
 // if timer out tell server player ran out of time
 
-socket.on('countdownTick', function (obj) {
-  loadCountdownWindow(obj.timeLeft);
-
-  if (obj.timeLeft <= 0) {
-    sendAjax('GET', '/getUsername', null, function (result) {
-      socket.emit('questionAnswered', {
-        question: questionText.textContent.substring(0, questionText.textContent.length - 1),
-        playerAnswer: null,
-        username: result.username
-      });
-    });
-  }
+socket.on('countdownTick', function (counter) {
+  loadCountdownWindow(counter);
+  if (counter <= 0 && counter !== null) submitAnswer(null);
 }); // update user score when answer is processed
 
-socket.on('answer processed', function (object) {
-  handleMessage(object.msg);
-
-  if (object.playerList) {
-    loadScoresWindow(object.playerList);
-  }
+socket.on('answerProcessed', function (msg) {
+  return handleMessage(msg);
 }); // update other scores when any person answers a question
 
-socket.on('playerAnswered', function (object) {
-  loadScoresWindow(object.playerList);
+socket.on('playerAnswered', function (playerList) {
+  return loadScoresWindow(Object.values(playerList));
 }); // render winners when game ends
 
-socket.on('gameOver', function (object) {
-  loadScoresWindow(object.playerList);
+socket.on('gameOver', function (playerList) {
+  loadScoresWindow(null);
   ReactDOM.render( /*#__PURE__*/React.createElement(GameOverWindow, {
-    players: object.playerList
+    players: playerList
   }), document.querySelector("#game"));
 }); // Listen for players disconnectiong
 
-socket.on('socket disconnect', function (object) {
-  handleMessage(object.msg);
-  loadScoresWindow(object.playerList);
+socket.on('socketDisconnect', function (dcData) {
+  handleMessage("".concat(dcData.player.username, " has disconnected."));
+  loadScoresWindow(Object.values(dcData.playerList));
 }); // Loads components on page load
 
 $(document).ready(function () {

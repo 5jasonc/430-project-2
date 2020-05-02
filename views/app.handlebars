@@ -18,11 +18,17 @@
 	<div class="navLink"><a href="/profile">Profile</a></div>
   </nav>
   
+  <div id="lobbySelect">
+	Searching for games...
+  </div>
+  
+  <div id="lobbyCreate">
+  </div>
+  
   <div id="countdown">
   </div>
   
   <div id="game">
-	<h2>Waiting for players...</h2>
   </div>
   
   <div id="scores">
@@ -31,6 +37,9 @@
   <div id="chat">
   </div>
   
+  <div id="csrfWindow">
+  </div>
+  <input type="hidden" id="roomKeyInput" value={props.csrf} />
   <div id="error">
     <h3><span id="errorMessage">NULL</span></h3>
   </div>

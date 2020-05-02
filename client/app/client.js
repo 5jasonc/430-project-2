@@ -1,11 +1,78 @@
-// holds clients chat log
+// holds client's chat log
 const chatLog = [];
 
 // initialize socket
 const socket = io();
 
+// holds csrf token during game
+const CsrfWindow = (props) => {
+	return (
+		<div>
+			<input type="hidden" name="_csrf" value={props.csrf} />
+		</div>
+	);
+};
+
+// renders lobby select window
+const LobbySelectWindow = (props) => {
+	if(props.rooms === null) return (<div></div>);
+	if(props.rooms.length <= 0) return (<div id="lobbyList"><h2>No games found!</h2></div>);
+		
+	const lobbySelectHTML = props.rooms.map((room) => {
+		return (
+			<div className="lobby">
+				<h3>{room.roomName}</h3>
+				<p>Players: {Object.keys(room.playerList).length}/{room.maxConnections}</p>
+				<div className="button" onClick={() => joinLobby(room.roomKey)}><h3>Join game</h3></div>
+			</div>
+		);
+	});
+	
+	return (
+		<div>
+			<h2>Available Games</h2>
+			<div id="lobbyList">
+				{lobbySelectHTML}
+			</div>
+		</div>
+	);
+};
+
+// renders lobby create window
+const LobbyCreateWindow = (props) => {
+	if(!props.showWindow) return (<div></div>);
+	
+	return (
+		<div>
+			<label htmlFor="roomNameText">Lobby Name: </label>
+			<input id="roomNameText" type="text" name="roomNameText" placeholder="(must be under 20 characters)" />
+			
+			<label htmlFor="maxPlayerSelect">Max Players: </label>
+			<p className="hint">(The game starts when this number has been reached)</p>
+			<select id="maxPlayerSelect" name="maxPlayerSelect">
+				<option value="2" selected="selected">2</option>
+				<option value="3">3</option>
+				<option value="4">4</option>
+				<option value="5">5</option>
+			</select>
+			
+			<label htmlFor="roundSelect">Number of rounds: </label>
+			<select id="roundSelect" name="roundSelect">
+				<option value="5" selected="selected">5</option>
+				<option value="10">10</option>
+				<option value="15">15</option>
+				<option value="20">20</option>
+			</select>
+			
+			<div className="button" onClick={createLobby}><h3>Create Lobby</h3></div>
+		</div>
+	);
+};
+
 // renders countdown window
 const CountdownWindow = (props) => {
+	if(props.timeLeft === null) return (<div></div>);
+	
 	return (
 		<div>
 			<h2>Time Left: {props.timeLeft}</h2>
@@ -15,6 +82,8 @@ const CountdownWindow = (props) => {
 
 // renders game window
 const GameWindow = (props) => {
+	if(props.question === null) return (<h2>Waiting for players...</h2>);
+		
 	return (
 		<div id="gameWindow">
 			<div id="question">
@@ -36,7 +105,7 @@ const GameWindow = (props) => {
 
 // renders chat window
 const ChatWindow = (props) => {
-	const chatHTML = chatLog.map((message) => {
+	const chatHTML = props.chats.map((message) => {
 		return (<li>{message}</li>);
 	});
 	
@@ -49,6 +118,8 @@ const ChatWindow = (props) => {
 
 // displays user's score
 const ScoreWindow = (props) => {
+	if(props.players === null) return (<div></div>);
+	
 	const scoreHTML = props.players.map((player) => {
 		return (
 			<li>
@@ -65,7 +136,6 @@ const ScoreWindow = (props) => {
 			<ul id="scoreList">
 				{scoreHTML}
 			</ul>
-			<input type="hidden" name="_csrf" value={props.csrf} />
 		</div>
 	);
 };
@@ -80,6 +150,7 @@ const GameOverWindow = (props) => {
 		if(i == 1) suffix = "st";
 		if(i == 2) suffix = "nd";
 		if(i == 3) suffix = "rd";
+		if(i >= 4) suffix = "th";
 		
 		return (
 			<div>
@@ -97,29 +168,70 @@ const GameOverWindow = (props) => {
 	);
 };
 
-// Renders to page
-const setup = (csrf) => {	
-	ReactDOM.render(
-		<ScoreWindow score={[]} csrf={csrf} />,
-		document.querySelector("#scores")
-	);
+// sends the socket information to create new lobby
+const createLobby = () => {
+	if(roomNameText.value === '') return handleError('Room name is required');
+	if(roomNameText.value.length >= 20) return handleError('Room name too long');
 	
+	const newRoom = { // room key creation taken from Xuejia Chen here: https://gist.github.com/6174/6062387
+		roomKey: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+		roomName: roomNameText.value.replace(/[^a-z0-9 ]/gim, "").trim(),
+		maxConnections: parseInt(maxPlayerSelect.options[maxPlayerSelect.selectedIndex].value),
+		maxQuestions: parseInt(roundSelect.options[roundSelect.selectedIndex].value),
+	};
+	
+	socket.emit('roomCreated', newRoom);
+	joinLobby(newRoom.roomKey);
+};
+
+// connect client to socket of lobby and send server player connect info
+const joinLobby = (roomKey) => {
+	sendAjax('GET', '/getUsername', null, (result) => {		
+		socket.emit('roomJoined', {
+			roomKey: roomKey,
+			player: {
+				username: result.username,
+				score: 0,
+				socketid: socket.id,
+			},
+		});
+		roomKeyInput.value = roomKey;
+		loadGameWindow(null, null, null, null, null);
+		loadLobbyWindow(null);
+		loadLobbyCreateWindow(false);
+	});
+};
+
+// load lobby window
+const loadLobbyWindow = (rooms) => {	
 	ReactDOM.render(
-		<ChatWindow chat={chatLog} />,
-		document.querySelector("#chat")
+		<LobbySelectWindow rooms={rooms} />,
+		document.querySelector("#lobbySelect")
+	);
+};
+
+const loadLobbyCreateWindow = (showWindow) => {
+	ReactDOM.render(
+		<LobbyCreateWindow showWindow={showWindow} />,
+		document.querySelector("#lobbyCreate")
 	);
 };
 
 // Submits answer to socket
-const submitAnswer = (e) => {
+const submitAnswer = (playerAnswer) => {
 	sendAjax('GET', '/getUsername', null, (result) => {
-		
 		socket.emit('questionAnswered', {
 		  question: questionText.textContent.substring(0, questionText.textContent.length - 1),
-		  playerAnswer: e.target.textContent,
+		  playerAnswer: playerAnswer,
 		  username: result.username,
+		  roomKey: roomKeyInput.value,
 	    });
 	});
+};
+
+// Handles when answer button is clicked
+const handleAnswer = (e) => {
+	submitAnswer(e.target.textContent);
 	
 	// remove events from buttons until next question
 	let answerButtons = document.querySelectorAll("#answers div div");
@@ -131,6 +243,7 @@ const submitAnswer = (e) => {
 
 // Load game window
 const loadGameWindow = (q, a1, a2, a3, a4) => {
+	$("#error").animate({width: 'hide'}, 350);
 	ReactDOM.render(
 		<GameWindow question={q} answer1={a1} answer2={a2} answer3={a3} answer4={a4} />,
 		document.querySelector("#game")
@@ -140,7 +253,7 @@ const loadGameWindow = (q, a1, a2, a3, a4) => {
 	let answerButtons = document.querySelectorAll("#answers div div");
 	
 	for(let button of answerButtons) {
-		button.onclick = submitAnswer;
+		button.onclick = handleAnswer;
 	}
 };
 
@@ -154,18 +267,16 @@ const loadCountdownWindow = (timeLeft) => {
 
 // Load scores window
 const loadScoresWindow = (players) => {
-	sendAjax('GET', '/getToken', null, (result) => {
-		ReactDOM.render(
-			<ScoreWindow players={players} csrf={result.csrfToken} />,
-			document.querySelector("#scores")
-		);
-	});
+	ReactDOM.render(
+		<ScoreWindow players={players} />,
+		document.querySelector("#scores")
+	);
 };
 
 // Load chat window
 const loadChats = () => {
 	ReactDOM.render(
-		<ChatWindow chat={chatLog} />,
+		<ChatWindow chats={chatLog} />,
 		document.querySelector("#chat")
 	);
 	
@@ -174,10 +285,15 @@ const loadChats = () => {
 	chat.scrollTop = chat.scrollHeight;
 };
 
-// Gets client csrf token
+// Gets and loads client csrf token
 const getToken = () => {
 	sendAjax('GET', '/getToken', null, (result) => {
-		setup(result.csrfToken);
+		ReactDOM.render(
+			<CsrfWindow csrf={result.csrfToken} />,
+			document.querySelector("#csrfWindow")
+		);
+		
+		loadLobbyCreateWindow(true);
 	});
 };
 
@@ -187,77 +303,52 @@ const handleMessage = (msg) => {
 	loadChats();
 }
 
-// if server pins player send back username
-socket.on('pingUser', (obj) => {
-	sendAjax('GET', '/getUsername', null, (result) => {
-		socket.emit('userConnected', { 
-			username: result.username,
-			score: 0,
-			socketid: socket.id,
-		});
-		
-		handleMessage("You have connected!");
-	});
-});
+// loads and renders lobby list when users connects to socket
+socket.on('lobbyList', (roomList) => loadLobbyWindow(roomList));
 
 // Listen for other players connecting
-socket.on('pingPlayers', (obj) => {
-	loadScoresWindow(obj.playerList);
+socket.on('pingPlayers', (connectData) => {
+	// tell user if they or another player connects
+	if(connectData.player.socketid === socket.id) handleMessage("You have connected!");
+	else { handleMessage(connectData.player.username + " has connected!"); }
 	
-	const lastPlayerConnected = obj.playerList[obj.playerList.length - 1];
-	
-	if(lastPlayerConnected.socketid !== socket.id) handleMessage(lastPlayerConnected.username + " has connected!");	
+	// start game if max connections reached
+	if(Object.keys(connectData.room.playerList).length >= connectData.room.maxConnections) {
+		loadScoresWindow(Object.values(connectData.room.playerList));
+		socket.emit('startGame', connectData.room);
+	}
 });
 
 // renders questions when needed
-socket.on('nextQuestion', (q) => {
-	loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4);
-});
+socket.on('nextQuestion', (q) => loadGameWindow(q.question, q.answer1, q.answer2, q.answer3, q.answer4));
 
 // updates countdown timer
 // if timer out tell server player ran out of time
-socket.on('countdownTick', (obj) => {
-	loadCountdownWindow(obj.timeLeft);
+socket.on('countdownTick', (counter) => {
+	loadCountdownWindow(counter);
 	
-	if(obj.timeLeft <= 0) {
-		sendAjax('GET', '/getUsername', null, (result) => {
-			socket.emit('questionAnswered', {
-			  question: questionText.textContent.substring(0, questionText.textContent.length - 1),
-			  playerAnswer: null,
-			  username: result.username,
-			});
-		});
-	}
+	if(counter <= 0 && counter !== null) submitAnswer(null);
 });
 
 // update user score when answer is processed
-socket.on('answer processed', (object) => {
-	handleMessage(object.msg);
-	
-	if(object.playerList) {
-		loadScoresWindow(object.playerList);
-	}
-});
+socket.on('answerProcessed', (msg) => handleMessage(msg));
 
 // update other scores when any person answers a question
-socket.on('playerAnswered', (object) => {
-	loadScoresWindow(object.playerList);
-});
+socket.on('playerAnswered', (playerList) => loadScoresWindow(Object.values(playerList)));
 
 // render winners when game ends
-socket.on('gameOver', (object) => {
-	loadScoresWindow(object.playerList);
-	
+socket.on('gameOver', (playerList) => {
+	loadScoresWindow(null);
 	ReactDOM.render(
-		<GameOverWindow players={object.playerList} />,
+		<GameOverWindow players={playerList} />,
 		document.querySelector("#game")
 	);
 });
 
 // Listen for players disconnectiong
-socket.on('socket disconnect', (object) => {
-    handleMessage(object.msg);
-	loadScoresWindow(object.playerList);
+socket.on('socketDisconnect', (dcData) => {
+    handleMessage(`${dcData.player.username} has disconnected.`);
+	loadScoresWindow(Object.values(dcData.playerList));
 });
 
 // Loads components on page load
