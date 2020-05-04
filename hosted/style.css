@@ -42,6 +42,16 @@ nav {
 	right: 15px;
 }
 
+#ad {
+	position: absolute;
+	right: 0;
+	top: 20%;
+	background-color: white;
+	border: 3px solid #052F5F;
+	padding: 15px;
+	height: 300px;
+}
+
 .navLink {
 	border-right: 1px solid #FFF761;
 	transition: all 0.3s;
