@@ -1,7 +1,8 @@
+// handles user login
 const handleLogin = (e) => {
 	e.preventDefault();
 	
-	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
 	
 	if($("#user").val() == '' || $("#pass").val() == '') {
 		handleError("Username or password is empty");
@@ -13,10 +14,11 @@ const handleLogin = (e) => {
 	return false;
 };
 
+// handles new user sign up
 const handleSignup = (e) => {
 	e.preventDefault();
 	
-	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
 	
 	if($("#user").val() == '' || $("#pass").val() == '' || $("#pass2").val() == '') {
 		handleError("All fields are required");
@@ -33,6 +35,7 @@ const handleSignup = (e) => {
 	return false;
 };
 
+// renders login window
 const LoginWindow = (props) => {
 	return (
 		<form id="loginForm" name="loginForm" onSubmit={handleLogin} action="/login" method="POST" className="mainForm">
@@ -46,6 +49,7 @@ const LoginWindow = (props) => {
 	);
 };
 
+// renders sign up window
 const SignupWindow = (props) => {
 	return (
 		<form id="signupForm" name="signupForm" onSubmit={handleSignup} action="/signup" method="POST" className="mainForm">
@@ -61,6 +65,7 @@ const SignupWindow = (props) => {
 	);
 };
 
+// load login window
 const createLoginWindow = (csrf) => {
 	ReactDOM.render(
 		<LoginWindow csrf={csrf} />,
@@ -68,6 +73,7 @@ const createLoginWindow = (csrf) => {
 	);
 };
 
+// load sign up window
 const createSignupWindow = (csrf) => {
 	ReactDOM.render(
 		<SignupWindow csrf={csrf} />,
@@ -75,7 +81,10 @@ const createSignupWindow = (csrf) => {
 	);
 };
 
+// setup page
 const setup = (csrf) => {
+	createLoginWindow(csrf);
+	
 	const loginButton = document.querySelector("#loginButton");
 	const signupButton = document.querySelector("#signupButton");
 	
@@ -90,16 +99,16 @@ const setup = (csrf) => {
 		createLoginWindow(csrf);
 		return false;
 	});
-	
-	createLoginWindow(csrf);
 };
 
+// get csrf token
 const getToken = () => {
 	sendAjax('GET', '/getToken', null, (result) => {
 		setup(result.csrfToken);
 	});
 };
 
+// setup on page load
 $(document).ready(function() {
 	getToken();
 });

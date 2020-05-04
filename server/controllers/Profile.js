@@ -40,14 +40,17 @@ const changePassword = (request, response) => {
     return res.status(400).json({ error: 'New passwords must match' });
   }
 
+  // make sure user's password is again
   return Account.AccountModel.authenticate(req.session.account.username,
     req.body.currentPass,
     (err, doc) => {
       if (err || !doc) return res.status(401).json({ error: 'Wrong password' });
 
+      // generate a new hash for user's new password
       return Account.AccountModel.generateHash(req.body.newPass, (salt, hash) => {
         if (!salt || !hash) return res.status(500).json({ error: 'Server failed to generate hash' });
 
+        // changes the user's password
         return Account.AccountModel.changePassword(doc, hash, salt, (error, acc) => {
           if (error || !acc) return res.status(500).json({ error: 'Server failed to update password' });
           return res.status(204).json();
@@ -98,7 +101,7 @@ const submitQuestion = (request, response) => {
 
   const savePromise = newQuestion.save();
 
-  savePromise.then(() => res.json({ message: 'Question submitted successfully!' }));
+  savePromise.then(() => res.status(201).json({ message: 'Question submitted successfully!' }));
 
   savePromise.catch((err) => {
     console.log(err);

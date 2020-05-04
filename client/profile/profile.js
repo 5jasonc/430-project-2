@@ -1,4 +1,3 @@
-
 // load user's account details and authorization level
 const loadAccount = () => {
 	sendAjax('GET', '/getProfile', null, (data) => {
@@ -11,7 +10,10 @@ const loadAccount = () => {
 		
 		// if user is admin display question submit window
 		if(data.account.isAdmin) {
+			$("#questionSubmit").show();
 			loadQuestionSubmitWindow(data.csrfToken);
+		} else {
+			$("#passwordChange").css({'margin-right': '0'});
 		}
 	});
 };
@@ -20,7 +22,7 @@ const loadAccount = () => {
 const handleQuestionSubmit = (e) => {
 	e.preventDefault();
 	
-	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
 	
 	const q = $("#questionText").val();
 	const aChoice1 = $("#answerChoice1").val();
@@ -59,7 +61,7 @@ const handleQuestionSubmit = (e) => {
 const handlePassChange = (e) => {
 	e.preventDefault();
 	
-	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
 	
 	if($("#currentPass").val() == '' || $("#newPass").val() == '' || $("#newPass2").val() == '') {
 		handleError("All fields are required");
@@ -89,6 +91,7 @@ const ProfileWindow = (props) => {
 	);
 };
 
+// renders password change window
 const PasswordChangeWindow = (props) => {
 	return (
 		<form id="passChangeForm" name="passChangeForm" onSubmit={handlePassChange} action="/passChange" method="POST" className="mainForm">
@@ -109,7 +112,7 @@ const PasswordChangeWindow = (props) => {
 // renders if admin to allow question submission
 const QuestionSubmitWindow = (props) => {
 	return (
-		<form id="qSubmitForm" name="qSubmitForm" onSubmit={handleQuestionSubmit} action="/qSubmit" method="POST">
+		<form id="qSubmitForm" name="qSubmitForm" onSubmit={handleQuestionSubmit} action="/qSubmit" method="POST" className="mainForm">
 			<label htmlFor="questionText">Question: </label>
 			<input id="questionText" type="text" name="questionText" placeholder="question to submit" />
 			
@@ -164,5 +167,6 @@ const getToken = () => {
 
 // when page loads get csrf token
 $(document).ready(function() {
+	$("#questionSubmit").hide();
 	getToken();
 });

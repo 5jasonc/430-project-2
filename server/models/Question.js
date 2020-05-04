@@ -71,7 +71,7 @@ QuestionSchema.statics.getRandomQuestion = (callback) => {
   return QuestionModel.aggregate([query], callback);
 };
 
-// SAVE MODEL
+// SAVE OUR MODEL
 QuestionModel = mongoose.model('Question', QuestionSchema);
 
 module.exports.QuestionModel = QuestionModel;

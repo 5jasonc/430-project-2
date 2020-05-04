@@ -115,19 +115,32 @@ AccountSchema.statics.authenticate = (username, password, callback) => {
   });
 };
 
-// Changes password for user in database
+// CHANGES PASSWORD FOR USER IN DATABASE
 AccountSchema.statics.changePassword = (doc, newHash, salt, callback) => {
   const query = {
     password: newHash,
     salt,
   };
   return AccountModel.updateOne({ username: doc.username }, query, { multi: false }, callback);
-  // return callback(AccountModel.findOneAndUpdate({ username: doc.username }, query));
 };
 
 // ADDS SCORE TO AN ACCOUNT
+AccountSchema.statics.increaseScore = (username, scoreAmt, callback) => {
+  const query = {
+    $inc: { score: scoreAmt },
+  };
+  return AccountModel.updateOne({ username }, query, { multi: false }, callback);
+};
 
+// ADD GAME WON TO TOTAL OF GAMES WON FOR USER ACCOUNT
+AccountSchema.statics.gameWon = (username, callback) => {
+  const query = {
+    $inc: { gamesWon: 1 },
+  };
+  return AccountModel.updateOne({ username }, query, { multi: false }, callback);
+};
 
+// CREATE OUR MODEL
 AccountModel = mongoose.model('Account', AccountSchema);
 
 module.exports.AccountModel = AccountModel;

@@ -10,7 +10,12 @@ var loadAccount = function loadAccount() {
     }), document.querySelector("#content")); // if user is admin display question submit window
 
     if (data.account.isAdmin) {
+      $("#questionSubmit").show();
       loadQuestionSubmitWindow(data.csrfToken);
+    } else {
+      $("#passwordChange").css({
+        'margin-right': '0'
+      });
     }
   });
 }; // handles question submit for admin users
@@ -19,7 +24,7 @@ var loadAccount = function loadAccount() {
 var handleQuestionSubmit = function handleQuestionSubmit(e) {
   e.preventDefault();
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   var q = $("#questionText").val();
   var aChoice1 = $("#answerChoice1").val();
@@ -54,7 +59,7 @@ var handleQuestionSubmit = function handleQuestionSubmit(e) {
 var handlePassChange = function handlePassChange(e) {
   e.preventDefault();
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
 
   if ($("#currentPass").val() == '' || $("#newPass").val() == '' || $("#newPass2").val() == '') {
@@ -86,7 +91,8 @@ var ProfileWindow = function ProfileWindow(props) {
   }, "Score: ", props.score), /*#__PURE__*/React.createElement("h4", {
     className: "profileScore"
   }, "Games Won: ", props.gamesWon)));
-};
+}; // renders password change window
+
 
 var PasswordChangeWindow = function PasswordChangeWindow(props) {
   return /*#__PURE__*/React.createElement("form", {
@@ -135,7 +141,8 @@ var QuestionSubmitWindow = function QuestionSubmitWindow(props) {
     name: "qSubmitForm",
     onSubmit: handleQuestionSubmit,
     action: "/qSubmit",
-    method: "POST"
+    method: "POST",
+    className: "mainForm"
   }, /*#__PURE__*/React.createElement("label", {
     htmlFor: "questionText"
   }, "Question: "), /*#__PURE__*/React.createElement("input", {
@@ -218,6 +225,7 @@ var getToken = function getToken() {
 
 
 $(document).ready(function () {
+  $("#questionSubmit").hide();
   getToken();
 });
 "use strict";
@@ -225,26 +233,26 @@ $(document).ready(function () {
 var handleError = function handleError(message) {
   $("#errorMessage").text(message);
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   $("#error").animate({
-    width: 'toggle'
+    height: 'toggle'
   }, 350);
 };
 
 var serverResponse = function serverResponse(response) {
   $("#errorMessage").text(response.message);
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   $("#error").animate({
-    width: 'toggle'
+    height: 'toggle'
   }, 350);
 };
 
 var redirect = function redirect(response) {
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   window.location = response.redirect;
 };

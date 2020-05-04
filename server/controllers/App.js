@@ -1,10 +1,31 @@
 const models = require('../models');
 
-const { Question } = models;
+const { Question, Account } = models;
 
 // Renders game screen
 const gamePage = (req, res) => {
   res.render('app', { csrfToken: req.csrfToken() });
+};
+
+// Renders 404 page
+const getNotFound = (req, res) => {
+  res.render('notFound');
+};
+
+// Adds score to user account
+const addScore = (username, scoreAmt, callback) => {
+  Account.AccountModel.increaseScore(username, scoreAmt, (err, doc) => {
+    if (err || !doc) return callback(false);
+    return callback(true);
+  });
+};
+
+// adds a game to the total of games won for user account
+const gameWon = (username, callback) => {
+  Account.AccountModel.gameWon(username, (err, doc) => {
+    if (err || !doc) return callback(false);
+    return callback(true);
+  });
 };
 
 // Returns if player answer matches correct answer for question
@@ -34,3 +55,6 @@ const getQuestion = (callback) => {
 module.exports.gamePage = gamePage;
 module.exports.getResult = getResult;
 module.exports.getQuestion = getQuestion;
+module.exports.getNotFound = getNotFound;
+module.exports.addScore = addScore;
+module.exports.gameWon = gameWon;

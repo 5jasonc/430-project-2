@@ -23,7 +23,7 @@ const LobbySelectWindow = (props) => {
 			<div className="lobby">
 				<h3>{room.roomName}</h3>
 				<p>Players: {Object.keys(room.playerList).length}/{room.maxConnections}</p>
-				<div className="button" onClick={() => joinLobby(room.roomKey)}><h3>Join game</h3></div>
+				<input type="submit" className="formSubmit" onClick={() => joinLobby(room.roomKey)} value="Join Game" />
 			</div>
 		);
 	});
@@ -43,12 +43,11 @@ const LobbyCreateWindow = (props) => {
 	if(!props.showWindow) return (<div></div>);
 	
 	return (
-		<div>
+		<div className="mainForm">
 			<label htmlFor="roomNameText">Lobby Name: </label>
 			<input id="roomNameText" type="text" name="roomNameText" placeholder="(must be under 20 characters)" />
 			
 			<label htmlFor="maxPlayerSelect">Max Players: </label>
-			<p className="hint">(The game starts when this number has been reached)</p>
 			<select id="maxPlayerSelect" name="maxPlayerSelect">
 				<option value="2" selected="selected">2</option>
 				<option value="3">3</option>
@@ -64,7 +63,7 @@ const LobbyCreateWindow = (props) => {
 				<option value="20">20</option>
 			</select>
 			
-			<div className="button" onClick={createLobby}><h3>Create Lobby</h3></div>
+			<input type="submit" className="formSubmit" onClick={createLobby} value="Create Lobby" />
 		</div>
 	);
 };
@@ -82,7 +81,7 @@ const CountdownWindow = (props) => {
 
 // renders game window
 const GameWindow = (props) => {
-	if(props.question === null) return (<h2>Waiting for players...</h2>);
+	if(props.question === null) return (<div><h2>Waiting for players...</h2><h3>(The game will start when max players have been reached)</h3></div>);
 		
 	return (
 		<div id="gameWindow">
@@ -91,12 +90,12 @@ const GameWindow = (props) => {
 			</div>
 			<div id="answers">
 				<div id="topAnswers">
-					<div><h4>{props.answer1}</h4></div>
-					<div><h4>{props.answer2}</h4></div>
+					<input type="submit" className="formSubmit" value={props.answer1} />
+					<input type="submit" className="formSubmit" value={props.answer2} />
 				</div>
 				<div id="bottomAnswers">
-					<div><h4>{props.answer3}</h4></div>
-					<div><h4>{props.answer4}</h4></div>
+					<input type="submit" className="formSubmit" value={props.answer3} />
+					<input type="submit" className="formSubmit" value={props.answer4} />
 				</div>
 			</div>
 		</div>
@@ -132,11 +131,9 @@ const ScoreWindow = (props) => {
 	});
 	
 	return (
-		<div id="scores">
-			<ul id="scoreList">
-				{scoreHTML}
-			</ul>
-		</div>
+		<ul id="scoreList">
+			{scoreHTML}
+		</ul>
 	);
 };
 
@@ -186,6 +183,10 @@ const createLobby = () => {
 
 // connect client to socket of lobby and send server player connect info
 const joinLobby = (roomKey) => {
+	$("#game").show();
+	$("#chat").show();
+	$("#lobbySelect").hide();
+	$("#lobbyCreate").hide();
 	sendAjax('GET', '/getUsername', null, (result) => {		
 		socket.emit('roomJoined', {
 			roomKey: roomKey,
@@ -210,6 +211,7 @@ const loadLobbyWindow = (rooms) => {
 	);
 };
 
+// load lobby create window
 const loadLobbyCreateWindow = (showWindow) => {
 	ReactDOM.render(
 		<LobbyCreateWindow showWindow={showWindow} />,
@@ -231,10 +233,10 @@ const submitAnswer = (playerAnswer) => {
 
 // Handles when answer button is clicked
 const handleAnswer = (e) => {
-	submitAnswer(e.target.textContent);
+	submitAnswer(e.target.value);
 	
 	// remove events from buttons until next question
-	let answerButtons = document.querySelectorAll("#answers div div");
+	let answerButtons = document.querySelectorAll("#answers .formSubmit");
 	
 	for(let button of answerButtons) {
 		button.onclick = () => {};
@@ -243,14 +245,14 @@ const handleAnswer = (e) => {
 
 // Load game window
 const loadGameWindow = (q, a1, a2, a3, a4) => {
-	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
 	ReactDOM.render(
 		<GameWindow question={q} answer1={a1} answer2={a2} answer3={a3} answer4={a4} />,
 		document.querySelector("#game")
 	);
 	
 	// tie click events to answer buttons
-	let answerButtons = document.querySelectorAll("#answers div div");
+	let answerButtons = document.querySelectorAll("#answers .formSubmit");
 	
 	for(let button of answerButtons) {
 		button.onclick = handleAnswer;
@@ -287,6 +289,11 @@ const loadChats = () => {
 
 // Gets and loads client csrf token
 const getToken = () => {
+	$("#game").hide();
+	$("#chat").hide();
+	$("#scores").hide();
+	$("#lobbySelect").show();
+	$("#lobbyCreate").show();
 	sendAjax('GET', '/getToken', null, (result) => {
 		ReactDOM.render(
 			<CsrfWindow csrf={result.csrfToken} />,
@@ -303,6 +310,9 @@ const handleMessage = (msg) => {
 	loadChats();
 }
 
+// logs message to chat whenever message/error sent back from the server
+socket.on('message', (message) => handleMessage(message));
+
 // loads and renders lobby list when users connects to socket
 socket.on('lobbyList', (roomList) => loadLobbyWindow(roomList));
 
@@ -315,6 +325,7 @@ socket.on('pingPlayers', (connectData) => {
 	// start game if max connections reached
 	if(Object.keys(connectData.room.playerList).length >= connectData.room.maxConnections) {
 		loadScoresWindow(Object.values(connectData.room.playerList));
+		$("#scores").show();
 		socket.emit('startGame', connectData.room);
 	}
 });
@@ -339,6 +350,8 @@ socket.on('playerAnswered', (playerList) => loadScoresWindow(Object.values(playe
 // render winners when game ends
 socket.on('gameOver', (playerList) => {
 	loadScoresWindow(null);
+	$("#scores").hide();
+	$("#chat").hide();
 	ReactDOM.render(
 		<GameOverWindow players={playerList} />,
 		document.querySelector("#game")

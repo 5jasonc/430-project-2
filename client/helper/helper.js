@@ -1,19 +1,19 @@
 const handleError = (message) => {
 	$("#errorMessage").text(message);
 
-	$("#error").animate({width: 'hide'}, 350);
-	$("#error").animate({width: 'toggle'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
+	$("#error").animate({height: 'toggle'}, 350);
 };
 
 const serverResponse = (response) => {
 	$("#errorMessage").text(response.message);
 	
-	$("#error").animate({width: 'hide'}, 350);
-	$("#error").animate({width: 'toggle'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
+	$("#error").animate({height: 'toggle'}, 350);
 };
 
 const redirect = (response) => {
-	$("#error").animate({width: 'hide'}, 350);
+	$("#error").animate({height: 'hide'}, 350);
 	window.location = response.redirect;
 };
 

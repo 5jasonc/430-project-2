@@ -1,9 +1,10 @@
 "use strict";
 
+// handles user login
 var handleLogin = function handleLogin(e) {
   e.preventDefault();
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
 
   if ($("#user").val() == '' || $("#pass").val() == '') {
@@ -13,12 +14,13 @@ var handleLogin = function handleLogin(e) {
 
   sendAjax('POST', $("#loginForm").attr("action"), $("#loginForm").serialize(), redirect);
   return false;
-};
+}; // handles new user sign up
+
 
 var handleSignup = function handleSignup(e) {
   e.preventDefault();
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
 
   if ($("#user").val() == '' || $("#pass").val() == '' || $("#pass2").val() == '') {
@@ -33,7 +35,8 @@ var handleSignup = function handleSignup(e) {
 
   sendAjax('POST', $("#signupForm").attr("action"), $("#signupForm").serialize(), redirect);
   return false;
-};
+}; // renders login window
+
 
 var LoginWindow = function LoginWindow(props) {
   return /*#__PURE__*/React.createElement("form", {
@@ -66,7 +69,8 @@ var LoginWindow = function LoginWindow(props) {
     type: "submit",
     value: "Sign In"
   }));
-};
+}; // renders sign up window
+
 
 var SignupWindow = function SignupWindow(props) {
   return /*#__PURE__*/React.createElement("form", {
@@ -106,21 +110,25 @@ var SignupWindow = function SignupWindow(props) {
     type: "submit",
     value: "Sign Up"
   }));
-};
+}; // load login window
+
 
 var createLoginWindow = function createLoginWindow(csrf) {
   ReactDOM.render( /*#__PURE__*/React.createElement(LoginWindow, {
     csrf: csrf
   }), document.querySelector("#content"));
-};
+}; // load sign up window
+
 
 var createSignupWindow = function createSignupWindow(csrf) {
   ReactDOM.render( /*#__PURE__*/React.createElement(SignupWindow, {
     csrf: csrf
   }), document.querySelector("#content"));
-};
+}; // setup page
+
 
 var setup = function setup(csrf) {
+  createLoginWindow(csrf);
   var loginButton = document.querySelector("#loginButton");
   var signupButton = document.querySelector("#signupButton");
   signupButton.addEventListener("click", function (e) {
@@ -133,14 +141,15 @@ var setup = function setup(csrf) {
     createLoginWindow(csrf);
     return false;
   });
-  createLoginWindow(csrf);
-};
+}; // get csrf token
+
 
 var getToken = function getToken() {
   sendAjax('GET', '/getToken', null, function (result) {
     setup(result.csrfToken);
   });
-};
+}; // setup on page load
+
 
 $(document).ready(function () {
   getToken();
@@ -150,26 +159,26 @@ $(document).ready(function () {
 var handleError = function handleError(message) {
   $("#errorMessage").text(message);
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   $("#error").animate({
-    width: 'toggle'
+    height: 'toggle'
   }, 350);
 };
 
 var serverResponse = function serverResponse(response) {
   $("#errorMessage").text(response.message);
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   $("#error").animate({
-    width: 'toggle'
+    height: 'toggle'
   }, 350);
 };
 
 var redirect = function redirect(response) {
   $("#error").animate({
-    width: 'hide'
+    height: 'hide'
   }, 350);
   window.location = response.redirect;
 };

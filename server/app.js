@@ -98,10 +98,10 @@ const server = app.listen(port, (err) => {
 // CONFIGURE SOCKET IO AND GAME SETTINGS
 const io = socketIO(server);
 
-// import app controller to get some functions
+// import app controller to get some game functions
 const game = require('./controllers/App.js');
 
-// list of rooms
+// create list of rooms
 const roomList = {};
 
 // Adds room to room list object
@@ -129,6 +129,7 @@ const getQuestionObj = (callback) => {
 };
 
 // starts the timer
+// timer code taken from zoecarver here: https://stackoverflow.com/questions/42398795/countdown-timer-broadcast-with-socket-io-and-node-js
 const startTimer = (roomKey) => {
   let counter = 10;
 
@@ -145,6 +146,7 @@ const startTimer = (roomKey) => {
   }
 };
 
+// PINGS USERS UPDATED LOBBY LIST TO SHOW NEW ROOM INFO
 const updateLobbyList = () => {
   const lobbyList = Object.values(roomList).filter((room) => room.isAvailable);
   io.to('lobby').emit('lobbyList', Object.values(lobbyList));
@@ -152,18 +154,19 @@ const updateLobbyList = () => {
 
 // SET UP SERVER SIDE LISTENING FOR EACH SOCKET ON CONNECT
 const onConnection = (socket) => {
-// ping user with room list when they join
+  // ping user with room list when they join
   socket.join('lobby');
   updateLobbyList();
 
 
-  // when user joins room ping user
+  // when user joins room ping users and update lobby select for users in lobby
   socket.on('roomJoined', (connectData) => {
     socket.leave('lobby');
     socket.join(connectData.roomKey);
 
     roomList[connectData.roomKey].playerList[socket.id] = connectData.player;
 
+    // when max players is reached take room off list
     if (Object.keys(roomList[connectData.roomKey].playerList).length
 >= roomList[connectData.roomKey].maxConnections) {
       roomList[connectData.roomKey].isAvailable = false;
@@ -188,19 +191,24 @@ const onConnection = (socket) => {
     });
   });
 
-  // on socket disconnect take out of playerList in room and ping other players
+  // on socket disconnect take socket out of playerList in room and ping other players
   socket.on('disconnect', () => {
     Object.keys(roomList).forEach((room) => {
       if (roomList[room].playerList[socket.id]) {
         const disconnectingPlayer = roomList[room].playerList[socket.id];
         delete roomList[room].playerList[socket.id];
 
-        updateLobbyList();
+        // if last player in room disconnects remove room
+        if (Object.keys(roomList[room].playerList).length <= 0) {
+          delete roomList[room];
+        } else {
+          updateLobbyList();
 
-        io.to(room).emit('socketDisconnect', {
-          player: disconnectingPlayer,
-          playerList: roomList[room].playerList,
-        });
+          io.to(room).emit('socketDisconnect', {
+            player: disconnectingPlayer,
+            playerList: roomList[room].playerList,
+          });
+        }
       }
     });
   });
@@ -236,16 +244,33 @@ const onConnection = (socket) => {
           const playerList = Object.values(roomList[object.roomKey].playerList).map((p) => p);
           playerList.sort((a, b) => ((a.score < b.score) ? 1 : -1));
 
+          // send message to winner and add to their total games won score
+          game.gameWon(playerList[0].username, (complete) => {
+            if (!complete) socket.emit('message', 'Error adding to total games won count!');
+            else { socket.emit('message', 'You win!!!'); }
+          });
+
+          // add score from game to each player's account
+          playerList.forEach((p) => {
+            game.addScore(p.username, p.score, (success) => {
+              if (!success) socket.emit('message', 'Error adding score to account!');
+              else { socket.emit('message', `${p.score} points have been added to your account!`); }
+            });
+          });
+
+          // clear timer for room
           clearInterval(roomList[object.roomKey].questionCountdown);
           roomList[object.roomKey].questionCountdown = null;
           io.to(object.roomKey).emit('countdownTick', null);
+
           io.to(object.roomKey).emit('gameOver', playerList);
-          roomList[object.roomKey].questionNum = 0;
         } else { // otherwise send next question to players
           getQuestionObj((qObject) => {
+            // reset timer for room
             clearInterval(roomList[object.roomKey].questionCountdown);
             roomList[object.roomKey].questionCountdown = null;
             startTimer(object.roomKey);
+
             io.to(object.roomKey).emit('nextQuestion', qObject);
           });
         }
